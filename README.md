@@ -15,7 +15,7 @@ Vercel creates/updates the tables on every deploy — no manual step needed ther
 
 Sign up with the email you listed in `ADMIN_EMAILS` to get admin access. Locally,
 visit http://localhost:3000/admin directly (subdomain routing is only enforced
-in production — see `middleware.ts`).
+in production — see `app/admin/page.tsx`).
 
 ## Environment variables
 

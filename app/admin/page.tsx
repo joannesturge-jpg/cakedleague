@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AdminLogin } from "./AdminLogin";
@@ -6,6 +8,14 @@ import { LogoutButton } from "@/app/components/LogoutButton";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
+  // The admin dashboard is only reachable at admin.<domain> — never on the
+  // main site, even if someone guesses the path. Local dev is exempt so you
+  // don't need a real subdomain to work on it.
+  const host = headers().get("host") || "";
+  if (process.env.NODE_ENV === "production" && !host.startsWith("admin.")) {
+    notFound();
+  }
+
   const user = await getCurrentUser();
 
   if (!user) {

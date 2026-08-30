@@ -1,7 +1,14 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import AdminPage from "@/app/admin/page";
 
 export default async function HomePage() {
+  const host = headers().get("host") || "";
+  if (host.startsWith("admin.")) {
+    return <AdminPage />;
+  }
+
   const user = await getCurrentUser();
 
   return (
