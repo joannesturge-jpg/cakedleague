@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { generateInviteCode } from "@/lib/leagues";
+import { generateInviteCode } from "@/lib/invite";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();

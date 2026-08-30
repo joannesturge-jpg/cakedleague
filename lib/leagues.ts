@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto";
-
 export const DUE_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
 
 export const DUE_DAY_LABELS: Record<string, string> = {
@@ -30,10 +28,6 @@ export const LEAGUE_EMOJIS = [
   "👑", "🔥", "🎯", "🎪", "🎨", "🍿", "🎲", "🥇",
   "🌟", "💰", "🎉", "🏅", "⚡", "🎧", "📺", "🎢",
 ];
-
-export function generateInviteCode() {
-  return randomBytes(6).toString("hex");
-}
 
 export function formatDueDate(dueDay: string, dueTime: string) {
   const day = dueDay.charAt(0) + dueDay.slice(1).toLowerCase();
