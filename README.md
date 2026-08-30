@@ -19,8 +19,11 @@ in production — see `middleware.ts`).
 
 ## Environment variables
 
-- `DATABASE_URL` — a Postgres connection string. Easiest free option: create a
-  project at supabase.com and copy its connection string.
+- `DATABASE_URL` / `DIRECT_URL` — Supabase's pooler connection strings, from
+  the project's Connect dialog. Use "Transaction pooler" (port 6543) for
+  `DATABASE_URL` and "Session pooler" (port 5432) for `DIRECT_URL` — do NOT
+  use the plain "Direct connection" string (`db.<ref>.supabase.co`), it's
+  IPv6-only and unreachable from Vercel's build environment.
 - `JWT_SECRET` — any random string, e.g. `openssl rand -hex 32`.
 - `ADMIN_EMAILS` — comma-separated emails that get admin access.
 - `RESEND_API_KEY` — optional in dev (reset links print to the server console
