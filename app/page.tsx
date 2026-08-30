@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
-import AdminPage from "@/app/admin/page";
+import { AdminDashboard } from "@/app/admin/AdminDashboard";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const host = headers().get("host") || "";
   if (host.startsWith("admin.")) {
-    return <AdminPage />;
+    return <AdminDashboard />;
   }
 
   const user = await getCurrentUser();
