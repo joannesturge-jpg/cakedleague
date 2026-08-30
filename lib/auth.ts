@@ -58,6 +58,11 @@ export async function getCurrentUser() {
   return prisma.user.findUnique({ where: { id: userId } });
 }
 
+export async function getAdminUser() {
+  const user = await getCurrentUser();
+  return user?.isAdmin ? user : null;
+}
+
 export function isAdminEmail(email: string) {
   const admins = (process.env.ADMIN_EMAILS ?? "")
     .split(",")

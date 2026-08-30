@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const COPY = {
   signup: {
@@ -26,6 +26,7 @@ const COPY = {
 
 export function AuthForm({ mode }: { mode: "signup" | "login" }) {
   const router = useRouter();
+  const next = useSearchParams().get("next");
   const copy = COPY[mode];
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -45,7 +46,7 @@ export function AuthForm({ mode }: { mode: "signup" | "login" }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
-      router.push("/dashboard");
+      router.push(next && next.startsWith("/") ? next : "/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

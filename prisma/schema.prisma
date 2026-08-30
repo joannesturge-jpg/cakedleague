@@ -16,28 +16,118 @@ model User {
   isAdmin      Boolean   @default(false)
   createdAt    DateTime  @default(now())
 
-  leagues       League[]
-  resetTokens   PasswordResetToken[]
+  notifyPicksDue Boolean @default(true)
+  notifyScoring  Boolean @default(true)
+  notifyInvites  Boolean @default(true)
+
+  leagues     League[]
+  memberships LeagueMember[]
+  resetTokens PasswordResetToken[]
+}
+
+model LeagueTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  subject        String
+  glyph          String   @default("🎬")
+  weeks          Int      @default(8)
+  scoringPerWeek Int      @default(1)
+  dueDay         String   @default("SUNDAY")
+  draftMode      String   @default("SNAKE")
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  rules   LeagueTemplateRule[]
+  leagues League[]
+}
+
+model LeagueTemplateRule {
+  id     String @id @default(cuid())
+  label  String
+  points Int
+  order  Int    @default(0)
+
+  template   LeagueTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId String
+
+  @@index([templateId])
 }
 
 model League {
-  id        String   @id @default(cuid())
-  name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  glyph       String   @default("🎬")
+  description String?
+  isActive    Boolean  @default(true)
+  visibility  String   @default("PRIVATE")
+  inviteCode  String   @unique
+  createdAt   DateTime @default(now())
+
+  weeks          Int?
+  startDate      DateTime?
+  scoringPerWeek Int?
+  dueDay         String
+  dueTime        String
+
+  draftMode            String
+  draftModeDescription String?
+
+  entryFeeEnabled    Boolean @default(false)
+  entryFeeAmount     Int?
+  entryFeePayMethod  String?
+  entryFeeHandle     String?
+
+  prizeEnabled Boolean @default(false)
+  prizePlaces  Int?
+  prizeRules   Json?
 
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId String
 
+  template   LeagueTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateId String?
+
+  rules   LeagueRule[]
+  members LeagueMember[]
+
   @@index([ownerId])
+  @@index([templateId])
+}
+
+model LeagueRule {
+  id     String @id @default(cuid())
+  label  String
+  points Int
+  order  Int    @default(0)
+
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  leagueId String
+
+  @@index([leagueId])
+}
+
+model LeagueMember {
+  id       String   @id @default(cuid())
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  leagueId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+
+  @@unique([leagueId, userId])
+  @@index([leagueId])
+  @@index([userId])
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
