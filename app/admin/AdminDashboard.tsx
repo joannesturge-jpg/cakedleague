@@ -33,7 +33,7 @@ export async function AdminDashboard() {
     );
   }
 
-  const [users, templates, notifySignups, publicLeagues] = await Promise.all([
+  const [users, templates, notifySignups, publicLeagues, allLeagues] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       select: {
@@ -43,7 +43,7 @@ export async function AdminDashboard() {
         createdAt: true,
         isAdmin: true,
         isBlocked: true,
-        _count: { select: { leagues: { where: { isActive: true } } } },
+        _count: { select: { leagues: { where: { isActive: true, deletedAt: null } } } },
       },
     }),
     prisma.leagueTemplate.findMany({
@@ -55,8 +55,19 @@ export async function AdminDashboard() {
       include: { template: { select: { name: true, glyph: true } } },
     }),
     prisma.league.findMany({
-      where: { visibility: "PUBLIC" },
+      where: { visibility: "PUBLIC", deletedAt: null },
       select: { id: true, templateId: true },
+    }),
+    prisma.league.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        tag: true,
+        isActive: true,
+        deletedAt: true,
+        _count: { select: { members: true } },
+      },
     }),
   ]);
 
@@ -72,6 +83,7 @@ export async function AdminDashboard() {
       templates={templates}
       notifySignups={notifySignups}
       publicLeagueByTemplate={publicLeagueByTemplate}
+      leagues={allLeagues}
     />
   );
 }

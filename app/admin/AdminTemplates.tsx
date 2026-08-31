@@ -17,6 +17,7 @@ export type AdminTemplateRow = {
   isActive: boolean;
   rules: AdminTemplateRule[];
   contestants: string[];
+  tag: string | null;
 };
 
 export function AdminTemplates({
@@ -97,6 +98,7 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
 
   const [name, setName] = useState(template.name);
   const [subject, setSubject] = useState(template.subject);
+  const [tag, setTag] = useState(template.tag ?? "");
   const [glyph, setGlyph] = useState(template.glyph);
   const [weeks, setWeeks] = useState(template.weeks);
   const [scoringPerWeek, setScoringPerWeek] = useState(template.scoringPerWeek);
@@ -132,6 +134,7 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
         body: JSON.stringify({
           name,
           subject,
+          tag,
           glyph,
           weeks,
           scoringPerWeek,
@@ -283,6 +286,14 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="The Great British Bake Off, S16"
+                className={fieldInput}
+              />
+            </Field>
+            <Field label="Tag">
+              <input
+                value={tag}
+                onChange={(e) => setTag(e.target.value.toUpperCase())}
+                placeholder="GBBO"
                 className={fieldInput}
               />
             </Field>

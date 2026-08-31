@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function JoinPage({ params }: { params: { code: string } }) {
   const league = await prisma.league.findUnique({ where: { inviteCode: params.code } });
-  if (!league) notFound();
+  if (!league || league.deletedAt) notFound();
 
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/join/${params.code}`);

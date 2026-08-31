@@ -10,6 +10,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
   if (league.ownerId !== user.id) return NextResponse.json({ error: "Only the commissioner can delete this league" }, { status: 403 });
 
-  await prisma.league.delete({ where: { id: params.id } });
+  // Soft delete — keeps the row (and its history) around for the admin
+  // Leagues table instead of erasing it outright.
+  await prisma.league.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
   return NextResponse.json({ ok: true });
 }

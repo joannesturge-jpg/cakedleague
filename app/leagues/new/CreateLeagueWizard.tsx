@@ -23,7 +23,7 @@ type Template = {
   rules: TemplateRule[];
 };
 
-type Rule = { label: string; points: number };
+type Rule = { label: string; points: number; isCustom: boolean };
 type PrizeRow = { place: string; type: "flat" | "pct"; value: number };
 
 const PLACE_LABELS = ["1st", "2nd", "3rd", "4th"];
@@ -58,7 +58,9 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
   // Custom ("start from scratch") leagues aren't available yet — always
   // start on the first active template (Bake Off / DWTS).
   const [templateId, setTemplateId] = useState<string | null>(templates[0]?.id ?? null);
-  const [rules, setRules] = useState<Rule[]>(() => templates[0]?.rules.map((r) => ({ label: r.label, points: r.points })) ?? []);
+  const [rules, setRules] = useState<Rule[]>(
+    () => templates[0]?.rules.map((r) => ({ label: r.label, points: r.points, isCustom: false })) ?? []
+  );
   const [ruleDraft, setRuleDraft] = useState("");
   const template = templates.find((t) => t.id === templateId) ?? null;
   const steps = template ? TEMPLATE_STEPS : SCRATCH_STEPS;
@@ -90,7 +92,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
 
   function selectTemplate(t: Template) {
     setTemplateId(t.id);
-    setRules(t.rules.map((r) => ({ label: r.label, points: r.points })));
+    setRules(t.rules.map((r) => ({ label: r.label, points: r.points, isCustom: false })));
     setWeeks(t.weeks);
     setScoringPerWeek(t.scoringPerWeek);
     setDueDay(t.dueDay);
@@ -99,7 +101,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
 
   function addRule() {
     if (!ruleDraft.trim()) return;
-    setRules((r) => [...r, { label: ruleDraft.trim(), points: 1 }]);
+    setRules((r) => [...r, { label: ruleDraft.trim(), points: 1, isCustom: true }]);
     setRuleDraft("");
   }
 
@@ -707,6 +709,9 @@ function RuleEditor({
           Add rule
         </button>
       </div>
+      <p className="text-xs text-cream/45 mt-2.5">
+        Adding your own rule will require you to manually score it each week to adjust players&apos; points.
+      </p>
     </div>
   );
 }

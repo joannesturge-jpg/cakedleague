@@ -32,13 +32,14 @@ export async function POST(request: Request) {
 
   const rules = Array.isArray(body.rules)
     ? body.rules
-        .filter((r: unknown): r is { label: string; points: number } =>
+        .filter((r: unknown): r is { label: string; points: number; isCustom?: boolean } =>
           typeof r === "object" && r !== null && typeof (r as { label?: unknown }).label === "string"
         )
-        .map((r: { label: string; points: number }, i: number) => ({
+        .map((r: { label: string; points: number; isCustom?: boolean }, i: number) => ({
           label: r.label.trim(),
           points: Math.round(Number(r.points) || 0),
           order: i,
+          isCustom: !!r.isCustom,
         }))
     : [];
 
@@ -52,6 +53,9 @@ export async function POST(request: Request) {
       inviteCode: generateInviteCode(),
       ownerId: user.id,
       templateId: template.id,
+      // Copied at creation so the tag survives even if the member later edits
+      // their league's settings, or the template itself changes.
+      tag: template.tag,
       weeks: typeof body.weeks === "number" ? body.weeks : null,
       startDate: typeof body.startDate === "string" && body.startDate ? new Date(body.startDate) : null,
       scoringPerWeek: typeof body.scoringPerWeek === "number" ? body.scoringPerWeek : null,

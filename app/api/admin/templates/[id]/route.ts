@@ -11,6 +11,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   if (typeof body.name === "string") data.name = body.name.trim();
   if (typeof body.subject === "string") data.subject = body.subject.trim();
+  if (typeof body.tag === "string") data.tag = body.tag.trim().toUpperCase() || null;
   if (typeof body.glyph === "string" && body.glyph) data.glyph = body.glyph;
   if (typeof body.weeks === "number") data.weeks = Math.max(1, Math.round(body.weeks));
   if (typeof body.scoringPerWeek === "number") data.scoringPerWeek = Math.max(1, Math.round(body.scoringPerWeek));

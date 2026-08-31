@@ -9,7 +9,7 @@ export default async function PublicLeaguesPage() {
 
   const [publicLeagues, shows] = await Promise.all([
     prisma.league.findMany({
-      where: { visibility: "PUBLIC" },
+      where: { visibility: "PUBLIC", deletedAt: null },
       include: {
         _count: { select: { members: true } },
         members: { where: { userId: user?.id ?? "__none__" }, select: { id: true } },

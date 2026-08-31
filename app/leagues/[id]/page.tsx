@@ -18,7 +18,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
     },
   });
 
-  if (!league) notFound();
+  if (!league || league.deletedAt) notFound();
 
   const isMember = league.members.some((m) => m.userId === user.id);
   const isOwner = league.ownerId === user.id;

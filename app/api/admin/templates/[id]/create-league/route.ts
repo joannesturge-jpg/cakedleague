@@ -16,7 +16,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
   });
   if (!template) return NextResponse.json({ error: "Template not found" }, { status: 404 });
 
-  const existing = await prisma.league.findFirst({ where: { templateId: template.id, visibility: "PUBLIC" } });
+  const existing = await prisma.league.findFirst({
+    where: { templateId: template.id, visibility: "PUBLIC", deletedAt: null },
+  });
   if (existing) return NextResponse.json({ id: existing.id });
 
   const league = await prisma.league.create({
@@ -33,6 +35,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       draftMode: template.draftMode,
       ownerId: admin.id,
       templateId: template.id,
+      tag: template.tag,
       rules: {
         create: template.rules.map((r) => ({ label: r.label, points: r.points, order: r.order })),
       },

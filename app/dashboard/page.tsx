@@ -11,7 +11,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const memberships = await prisma.leagueMember.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, league: { deletedAt: null } },
     include: { league: true },
     orderBy: { joinedAt: "desc" },
   });

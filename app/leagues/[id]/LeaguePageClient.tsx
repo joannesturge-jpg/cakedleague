@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DRAFT_MODE_LABELS, formatDueDate } from "@/lib/leagues";
 
-type Rule = { id: string; label: string; points: number };
+type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type Member = { id: string; userId: string; role: string; notifyPicksDue: boolean; user: { name: string } };
 type Template = { id: string; name: string } | null;
 type League = {
@@ -67,6 +67,7 @@ export function LeaguePageClient({
 
   const weeks = league.weeks ?? undefined;
   const scoringPerWeek = league.scoringPerWeek ?? undefined;
+  const hasCustomRules = league.rules.some((r) => r.isCustom);
 
   function copyInvite() {
     navigator.clipboard.writeText(`${window.location.origin}/join/${league.inviteCode}`);
@@ -135,7 +136,7 @@ export function LeaguePageClient({
         <TabButton active={tab === "rankings"} onClick={() => setTab("rankings")}>
           Rankings
         </TabButton>
-        {isOwner && (
+        {isOwner && hasCustomRules && (
           <TabButton active={tab === "scoring"} onClick={() => setTab("scoring")}>
             Scoring
           </TabButton>

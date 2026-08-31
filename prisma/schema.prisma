@@ -39,6 +39,7 @@ model LeagueTemplate {
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   contestants    String[] @default([])
+  tag            String?
 
   rules          LeagueTemplateRule[]
   leagues        League[]
@@ -70,14 +71,16 @@ model LeagueTemplateRule {
 }
 
 model League {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
-  glyph       String   @default("🎬")
+  glyph       String    @default("🎬")
   description String?
-  isActive    Boolean  @default(true)
-  visibility  String   @default("PRIVATE")
-  inviteCode  String   @unique
-  createdAt   DateTime @default(now())
+  isActive    Boolean   @default(true)
+  visibility  String    @default("PRIVATE")
+  inviteCode  String    @unique
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+  tag         String?
 
   weeks          Int?
   startDate      DateTime?
@@ -112,10 +115,11 @@ model League {
 }
 
 model LeagueRule {
-  id     String @id @default(cuid())
-  label  String
-  points Int
-  order  Int    @default(0)
+  id       String  @id @default(cuid())
+  label    String
+  points   Int
+  order    Int     @default(0)
+  isCustom Boolean @default(false)
 
   league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   leagueId String

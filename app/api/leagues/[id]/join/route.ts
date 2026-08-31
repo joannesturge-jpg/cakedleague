@@ -8,7 +8,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const league = await prisma.league.findUnique({ where: { id: params.id } });
-  if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
+  if (!league || league.deletedAt) return NextResponse.json({ error: "League not found" }, { status: 404 });
   if (league.visibility !== "PUBLIC") {
     return NextResponse.json({ error: "This league is invite-only" }, { status: 403 });
   }
