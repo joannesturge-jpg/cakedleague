@@ -93,18 +93,16 @@ export async function sendSignupConfirmationEmail(to: string, name: string) {
 }
 
 export async function sendLeagueCreatedEmail(to: string, name: string, leagueName: string, leagueId: string) {
-  const firstName = escapeHtml(name.split(" ")[0] || name);
-  await send(
-    to,
-    `${leagueName} is live`,
-    emailShell(
-      `${firstName}, your league is live`,
-      `<p><strong>${escapeHtml(leagueName)}</strong> is ready to go. Share the invite link from your league page to bring people in.</p>`,
-      "View league",
-      `${APP_URL}/leagues/${leagueId}`
-    ),
-    "League created confirmation"
-  );
+  const safeLeagueName = escapeHtml(leagueName);
+  const leagueUrl = `${APP_URL}/leagues/${leagueId}`;
+  await send(to, `You created ${leagueName}!`, leagueCreatedHtml(safeLeagueName, leagueUrl), "League created confirmation");
+}
+
+// Exported straight from the Resend Template editor, with the league name
+// and invite link filled in where the static export said "a league" / linked
+// to the generic dashboard.
+function leagueCreatedHtml(safeLeagueName: string, leagueUrl: string) {
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="width=device-width" name="viewport"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta name="x-apple-disable-message-reformatting"/><meta content="telephone=no,address=no,email=no,date=no,url=no" name="format-detection"/><title>You successfully created ${safeLeagueName}</title><style>@media (prefers-color-scheme: dark){li::marker{color:#c4c4c4}}</style></head><body dir="ltr" lang="en"><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">You successfully created ${safeLeagueName}</div><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td dir="ltr" lang="en" style="font-family:-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, &#x27;Roboto&#x27;, &#x27;Oxygen&#x27;, &#x27;Ubuntu&#x27;, &#x27;Cantarell&#x27;, &#x27;Fira Sans&#x27;, &#x27;Droid Sans&#x27;, &#x27;Helvetica Neue&#x27;, sans-serif;font-size:1em;min-height:100%;line-height:155%"><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;align:center;width:100%;border-radius:0px;line-height:155%"><tbody><tr style="width:100%"><td style="padding-top:0px;padding-right:0px;padding-bottom:0px;padding-left:0px"><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody style="width:100%"><tr style="width:100%"><td align="left" data-id="__react-email-column"><img alt="The Caked Leagues logo is displayed in white text on a dark purple background." src="https://resend-attachments.s3.amazonaws.com/b5f14108-30d6-49bb-a028-902f40ab49d0" style="display:block;outline:none;border:none;text-decoration:none;max-width:100%;border-radius:8px;height:auto" width="100%"/></td></tr></tbody></table><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em"><br/></p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em"><strong>Woo hooo! You created ${safeLeagueName}!</strong></p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">You can now <a href="${leagueUrl}" rel="noopener noreferrer nofollow" style="color:#0670DB;text-decoration-line:none;text-decoration:underline" target="_blank"><u>invite your friends to join you!</u></a></p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em">How exciting...the fun is just beginning. </p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em"><strong>Joanne</strong></p><p style="margin:0;padding:0;font-size:1em;padding-top:0.5em;padding-bottom:0.5em"><br/></p></td></tr></tbody></table></td></tr></tbody></table></body></html>`;
 }
 
 export async function sendLeagueJoinedEmail(to: string, name: string, leagueName: string, leagueId: string) {
