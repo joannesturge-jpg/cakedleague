@@ -49,6 +49,7 @@ model LeagueTemplate {
   rules          LeagueTemplateRule[]
   leagues        League[]
   notifySignups  NotifySignup[]
+  ruleAwards     LeagueTemplateRuleAward[]
 }
 
 model NotifySignup {
@@ -71,8 +72,29 @@ model LeagueTemplateRule {
 
   template   LeagueTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   templateId String
+  awards     LeagueTemplateRuleAward[]
 
   @@index([templateId])
+}
+
+// Admin-entered weekly scoring: which contestant(s) earned a given
+// template rule in a given week. Applies to every league built off that
+// template (matched by tag) since scoring lives at the template level,
+// not per league.
+model LeagueTemplateRuleAward {
+  id         String   @id @default(cuid())
+  week       Int
+  contestant String
+  createdAt  DateTime @default(now())
+
+  rule   LeagueTemplateRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  ruleId String
+
+  template   LeagueTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId String
+
+  @@unique([ruleId, week, contestant])
+  @@index([templateId, week])
 }
 
 model League {
