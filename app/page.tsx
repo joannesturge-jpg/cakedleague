@@ -69,12 +69,6 @@ export default async function HomePage() {
               >
                 {user ? "Go to my leagues" : "Start a league"}
               </Link>
-              <Link
-                href="/leagues"
-                className="px-8 py-4 rounded-full border border-cream/22 text-cream font-semibold text-base hover:border-cream transition"
-              >
-                Browse public leagues
-              </Link>
             </div>
           </div>
 

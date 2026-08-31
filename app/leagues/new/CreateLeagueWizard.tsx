@@ -52,23 +52,26 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
   const [name, setName] = useState("");
   const [glyph, setGlyph] = useState(LEAGUE_EMOJIS[0]);
   const [description, setDescription] = useState("");
-  const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PRIVATE");
+  // Only private leagues can be created for now — public leagues aren't launched yet.
+  const visibility = "PRIVATE" as const;
 
-  const [templateId, setTemplateId] = useState<string | null>(null);
-  const [rules, setRules] = useState<Rule[]>([]);
+  // Custom ("start from scratch") leagues aren't available yet — always
+  // start on the first active template (Bake Off / DWTS).
+  const [templateId, setTemplateId] = useState<string | null>(templates[0]?.id ?? null);
+  const [rules, setRules] = useState<Rule[]>(() => templates[0]?.rules.map((r) => ({ label: r.label, points: r.points })) ?? []);
   const [ruleDraft, setRuleDraft] = useState("");
   const template = templates.find((t) => t.id === templateId) ?? null;
   const steps = template ? TEMPLATE_STEPS : SCRATCH_STEPS;
   const safeStep = Math.min(step, steps.length - 1);
   const currentKey = steps[safeStep].key;
 
-  const [weeks, setWeeks] = useState(8);
+  const [weeks, setWeeks] = useState(templates[0]?.weeks ?? 8);
   const [startDate, setStartDate] = useState("");
-  const [scoringPerWeek, setScoringPerWeek] = useState(1);
-  const [dueDay, setDueDay] = useState("SUNDAY");
+  const [scoringPerWeek, setScoringPerWeek] = useState(templates[0]?.scoringPerWeek ?? 1);
+  const [dueDay, setDueDay] = useState(templates[0]?.dueDay ?? "SUNDAY");
   const [dueTime, setDueTime] = useState("20:00");
 
-  const [draftMode, setDraftMode] = useState("SNAKE");
+  const [draftMode, setDraftMode] = useState(templates[0]?.draftMode ?? "SNAKE");
   const [draftModeDescription, setDraftModeDescription] = useState("");
 
   const [entryFeeEnabled, setEntryFeeEnabled] = useState(false);
@@ -92,11 +95,6 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
     setScoringPerWeek(t.scoringPerWeek);
     setDueDay(t.dueDay);
     setDraftMode(t.draftMode);
-  }
-
-  function selectNoTemplate() {
-    setTemplateId(null);
-    setRules([]);
   }
 
   function addRule() {
@@ -186,9 +184,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
           </button>
         </div>
         <p className="text-xs text-cream/45 mb-6">
-          {visibility === "PRIVATE"
-            ? "Anyone with this link can join. Private leagues never appear on a public page."
-            : "Anyone with this link can join."}
+          Anyone with this link can join. Private leagues never appear on a public page.
         </p>
         <button
           onClick={() => router.push(`/leagues/${result.id}`)}
@@ -272,21 +268,12 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
               />
             </Field>
 
-            <Field label="Visibility">
-              <div className="flex gap-2">
-                {(["PRIVATE", "PUBLIC"] as const).map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setVisibility(v)}
-                    className={`px-4 py-2.5 rounded-full text-sm font-semibold border transition ${
-                      visibility === v ? "bg-pink text-ink border-pink" : "border-cream/20 text-cream/70 hover:border-cream/40"
-                    }`}
-                  >
-                    {v === "PRIVATE" ? "Private — invite link only" : "Public — anyone can find it"}
-                  </button>
-                ))}
-              </div>
-            </Field>
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-ink/40 border border-cream/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-cream/40 flex-none" />
+              <span className="text-sm text-cream/60">
+                Private league — invite link only. Public leagues are coming soon.
+              </span>
+            </div>
           </div>
         )}
 
@@ -314,19 +301,16 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
                     <p className="text-xs text-cream/55 leading-relaxed">{t.description || t.subject}</p>
                   </button>
                 ))}
-                <button
-                  onClick={selectNoTemplate}
-                  className={`text-left p-4 rounded-2xl border transition ${
-                    templateId === null ? "border-pink bg-pink/10" : "border-cream/12 bg-ink/30 hover:border-cream/30"
-                  }`}
-                >
+                <div className="text-left p-4 rounded-2xl border border-cream/10 bg-ink/15 opacity-55 cursor-not-allowed">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-2xl">✨</span>
-                    {templateId === null && <span className="text-pink text-lg">✓</span>}
+                    <span className="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full bg-cream/10 text-cream/60">
+                      COMING SOON
+                    </span>
                   </div>
-                  <h4 className="font-display text-lg tracking-wide mb-1">START FROM SCRATCH</h4>
-                  <p className="text-xs text-cream/55 leading-relaxed">Set your own season length and scoring rules.</p>
-                </button>
+                  <h4 className="font-display text-lg tracking-wide mb-1">CUSTOM LEAGUE</h4>
+                  <p className="text-xs text-cream/50 leading-relaxed">Set your own season length and scoring rules.</p>
+                </div>
               </div>
             </div>
 
@@ -532,7 +516,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
               <Fact label="Template" value={template ? template.name : "Custom"} />
               <Fact label="Drafting" value={DRAFT_MODES.find((d) => d.id === draftMode)?.name ?? draftMode} />
               <Fact label="Picks due" value={`${DUE_DAY_LABELS[dueDay]}s, ${dueTime}`} />
-              <Fact label="Visibility" value={visibility === "PUBLIC" ? "Public" : "Private"} />
+              <Fact label="Visibility" value="Private" />
               <Fact label="Entry fee" value={entryFeeEnabled ? `$${entryFeeAmount} via ${entryFeePayMethod}` : "None"} />
               <Fact label="Prize" value={prizeEnabled ? `${prizePlaces} place${prizePlaces > 1 ? "s" : ""} pay out` : "None"} />
             </div>

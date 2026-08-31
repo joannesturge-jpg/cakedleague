@@ -19,6 +19,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing drafting mechanic" }, { status: 400 });
   }
 
+  // Custom ("from scratch") leagues aren't available yet — every league
+  // must be built off one of the active templates (Bake Off / DWTS).
+  const template =
+    typeof body.templateId === "string"
+      ? await prisma.leagueTemplate.findFirst({ where: { id: body.templateId, isActive: true } })
+      : null;
+  if (!template) {
+    return NextResponse.json({ error: "Pick a show template — custom leagues aren't available yet" }, { status: 400 });
+  }
+
   const rules = Array.isArray(body.rules)
     ? body.rules
         .filter((r: unknown): r is { label: string; points: number } =>
@@ -36,10 +46,11 @@ export async function POST(request: Request) {
       name: body.name.trim(),
       glyph: typeof body.glyph === "string" && body.glyph ? body.glyph : "🎬",
       description: typeof body.description === "string" ? body.description.trim() : null,
-      visibility: body.visibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
+      // Public leagues aren't launched yet — every league is created private.
+      visibility: "PRIVATE",
       inviteCode: generateInviteCode(),
       ownerId: user.id,
-      templateId: typeof body.templateId === "string" ? body.templateId : null,
+      templateId: template.id,
       weeks: typeof body.weeks === "number" ? body.weeks : null,
       startDate: typeof body.startDate === "string" && body.startDate ? new Date(body.startDate) : null,
       scoringPerWeek: typeof body.scoringPerWeek === "number" ? body.scoringPerWeek : null,
