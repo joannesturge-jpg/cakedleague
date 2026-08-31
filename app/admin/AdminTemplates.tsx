@@ -19,7 +19,13 @@ export type AdminTemplateRow = {
   contestants: string[];
 };
 
-export function AdminTemplates({ templates }: { templates: AdminTemplateRow[] }) {
+export function AdminTemplates({
+  templates,
+  publicLeagueByTemplate,
+}: {
+  templates: AdminTemplateRow[];
+  publicLeagueByTemplate: Record<string, string>;
+}) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -69,7 +75,7 @@ export function AdminTemplates({ templates }: { templates: AdminTemplateRow[] })
 
       <div className="flex flex-col gap-2.5">
         {templates.map((t) => (
-          <TemplateCard key={t.id} template={t} />
+          <TemplateCard key={t.id} template={t} publicLeagueId={publicLeagueByTemplate[t.id] ?? null} />
         ))}
         {templates.length === 0 && (
           <div className="bg-white border border-[#E2E4E9] rounded-lg px-5 py-12 text-center text-sm text-[#6B7280]">
@@ -81,11 +87,13 @@ export function AdminTemplates({ templates }: { templates: AdminTemplateRow[] })
   );
 }
 
-function TemplateCard({ template }: { template: AdminTemplateRow }) {
+function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow; publicLeagueId: string | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [glyphPicker, setGlyphPicker] = useState(false);
+  const [creatingLeague, setCreatingLeague] = useState(false);
+  const [leagueId, setLeagueId] = useState(publicLeagueId);
 
   const [name, setName] = useState(template.name);
   const [subject, setSubject] = useState(template.subject);
@@ -165,6 +173,26 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
     if (res.ok) router.refresh();
   }
 
+  async function createPublicLeague() {
+    setCreatingLeague(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}/create-league`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Couldn't create the league (${res.status}).`);
+      setLeagueId(data.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create the league");
+    } finally {
+      setCreatingLeague(false);
+    }
+  }
+
+  function publicLeagueUrl(id: string) {
+    if (typeof window === "undefined") return "#";
+    return `${window.location.protocol}//${window.location.host.replace(/^admin\./, "")}/leagues/${id}`;
+  }
+
   return (
     <div className="bg-white border border-[#E2E4E9] rounded-lg overflow-hidden">
       <div className="flex items-center gap-3.5 flex-wrap px-[18px] py-4">
@@ -214,6 +242,24 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
         >
           {isActive ? "Unpublish" : "Publish"}
         </button>
+        {leagueId ? (
+          <a
+            href={publicLeagueUrl(leagueId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-2 rounded-md border border-[#C9E9D6] bg-[#EAFBF1] text-[13.5px] font-semibold text-[#1F9D55] hover:bg-[#DCF6E7] transition flex-none"
+          >
+            View public league
+          </a>
+        ) : (
+          <button
+            onClick={createPublicLeague}
+            disabled={creatingLeague}
+            className="px-3.5 py-2 rounded-md border border-[#D6D9E0] text-[13.5px] font-semibold hover:border-purple hover:text-purple transition flex-none disabled:opacity-60"
+          >
+            {creatingLeague ? "Creating…" : "Create public league"}
+          </button>
+        )}
         <button
           onClick={remove}
           className="px-3.5 py-2 rounded-md border border-[#EBD3D9] bg-[#FDF2F4] text-[13.5px] font-semibold text-[#C2314E] hover:bg-[#F9E2E7] transition flex-none"

@@ -10,11 +10,13 @@ export function AdminShell({
   users,
   templates,
   notifySignups,
+  publicLeagueByTemplate,
 }: {
   adminEmail: string;
   users: AdminUserRow[];
   templates: AdminTemplateRow[];
   notifySignups: NotifySignupRow[];
+  publicLeagueByTemplate: Record<string, string>;
 }) {
   const [tab, setTab] = useState<"users" | "templates" | "marketing">("users");
 
@@ -45,7 +47,9 @@ export function AdminShell({
 
       <div className="px-4 sm:px-8 py-6 pb-16">
         {tab === "users" && <AdminUsers users={users} />}
-        {tab === "templates" && <AdminTemplates templates={templates} />}
+        {tab === "templates" && (
+          <AdminTemplates templates={templates} publicLeagueByTemplate={publicLeagueByTemplate} />
+        )}
         {tab === "marketing" && <AdminMarketing signups={notifySignups} />}
       </div>
     </div>
