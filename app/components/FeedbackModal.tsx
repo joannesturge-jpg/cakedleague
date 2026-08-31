@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 export function FeedbackModal() {
   const [open, setOpen] = useState(false);
@@ -44,8 +45,9 @@ export function FeedbackModal() {
         Share feedback
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-5 bg-ink/70" onClick={close}>
+      {open &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-5 bg-ink/70" onClick={close}>
           <div
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md bg-card border border-cream/12 rounded-3xl p-7"
@@ -88,8 +90,9 @@ export function FeedbackModal() {
               </>
             )}
           </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
