@@ -91,6 +91,31 @@ export function AdminUsers({ users: initialUsers }: { users: AdminUserRow[] }) {
     setLeagueFilter("Any");
   }
 
+  function exportCsv() {
+    const header = ["Name", "Email", "Joined", "Leagues", "Admin", "Status"];
+    const rows = users.map((u) => [
+      u.name,
+      u.email,
+      u.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      String(u._count.leagues),
+      u.isAdmin ? "Yes" : "No",
+      u.isBlocked ? "Blocked" : "Active",
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `caked-leagues-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   async function handleResetPassword(id: string) {
     setError("");
     setBusyId(id);
@@ -179,6 +204,12 @@ export function AdminUsers({ users: initialUsers }: { users: AdminUserRow[] }) {
           />
           <button onClick={clearFilters} className="text-[13px] font-semibold text-[#5B6270] hover:text-purple transition">
             Clear
+          </button>
+          <button
+            onClick={exportCsv}
+            className="px-3.5 py-2.5 rounded-md border border-[#D6D9E0] bg-white text-[13px] font-semibold text-[#16181D] hover:border-purple hover:text-purple transition flex-none"
+          >
+            Export CSV
           </button>
         </div>
         <div className="flex items-center gap-4 flex-wrap">

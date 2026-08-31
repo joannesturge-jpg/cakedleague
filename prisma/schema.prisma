@@ -38,6 +38,7 @@ model LeagueTemplate {
   description    String?
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
+  contestants    String[] @default([])
 
   rules          LeagueTemplateRule[]
   leagues        League[]

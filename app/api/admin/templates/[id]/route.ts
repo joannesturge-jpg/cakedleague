@@ -18,6 +18,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (typeof body.draftMode === "string") data.draftMode = body.draftMode;
   if (typeof body.isActive === "boolean") data.isActive = body.isActive;
   if (typeof body.description === "string") data.description = body.description;
+  if (Array.isArray(body.contestants)) {
+    data.contestants = body.contestants.filter((c: unknown): c is string => typeof c === "string" && c.trim()).map((c: string) => c.trim());
+  }
 
   const ops = [];
 

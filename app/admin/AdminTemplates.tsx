@@ -16,6 +16,7 @@ export type AdminTemplateRow = {
   description: string | null;
   isActive: boolean;
   rules: AdminTemplateRule[];
+  contestants: string[];
 };
 
 export function AdminTemplates({ templates }: { templates: AdminTemplateRow[] }) {
@@ -97,12 +98,20 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
   const [isActive, setIsActive] = useState(template.isActive);
   const [rules, setRules] = useState(template.rules.map((r) => ({ label: r.label, points: r.points })));
   const [ruleDraft, setRuleDraft] = useState("");
+  const [contestants, setContestants] = useState(template.contestants);
+  const [contestantDraft, setContestantDraft] = useState("");
   const [error, setError] = useState("");
 
   function addRule() {
     if (!ruleDraft.trim()) return;
     setRules((r) => [...r, { label: ruleDraft.trim(), points: 1 }]);
     setRuleDraft("");
+  }
+
+  function addContestant() {
+    if (!contestantDraft.trim()) return;
+    setContestants((c) => [...c, contestantDraft.trim()]);
+    setContestantDraft("");
   }
 
   async function save() {
@@ -112,7 +121,19 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
       const res = await fetch(`/api/admin/templates/${template.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, subject, glyph, weeks, scoringPerWeek, dueDay, draftMode, description, isActive, rules }),
+        body: JSON.stringify({
+          name,
+          subject,
+          glyph,
+          weeks,
+          scoringPerWeek,
+          dueDay,
+          draftMode,
+          description,
+          isActive,
+          rules,
+          contestants,
+        }),
       });
       if (res.ok) {
         router.refresh();
@@ -251,6 +272,43 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
               className={`${fieldInput} resize-y mt-3.5`}
             />
           </Field>
+
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mt-5 mb-2.5">
+            CONTESTANTS ({contestants.length})
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {contestants.map((c, i) => (
+              <div key={i} className="flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-md bg-[#F8F9FB] border border-[#EDEFF3]">
+                <input
+                  value={c}
+                  onChange={(e) => setContestants((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
+                  className="w-32 py-0.5 bg-transparent border-none text-sm outline-none"
+                />
+                <button
+                  onClick={() => setContestants((prev) => prev.filter((_, j) => j !== i))}
+                  className="text-[#A7ADB8] hover:text-[#C2314E] text-base px-1"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {contestants.length === 0 && <p className="text-sm text-[#8A909B]">No contestants added yet.</p>}
+          </div>
+          <div className="flex gap-2 flex-wrap mb-1">
+            <input
+              value={contestantDraft}
+              onChange={(e) => setContestantDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addContestant())}
+              placeholder="Add a contestant name"
+              className="flex-1 min-w-[200px] px-3.5 py-2.5 rounded-md border border-[#D6D9E0] bg-white text-sm outline-none focus:border-purple transition"
+            />
+            <button
+              onClick={addContestant}
+              className="px-5 py-2.5 rounded-md bg-[#16181D] text-white font-semibold text-[13.5px] hover:bg-black transition"
+            >
+              Add contestant
+            </button>
+          </div>
 
           <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mt-5 mb-2.5">SCORING RULES</div>
           <div className="flex flex-col gap-1.5 mb-3">
