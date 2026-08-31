@@ -17,6 +17,10 @@ export async function POST(request: Request) {
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) return invalid();
 
+  if (user.isBlocked) {
+    return NextResponse.json({ error: "This account has been blocked. Contact support if that seems wrong." }, { status: 403 });
+  }
+
   const token = await createSessionToken(user.id);
   const res = NextResponse.json({ id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());

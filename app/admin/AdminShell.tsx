@@ -3,17 +3,20 @@ import { useState } from "react";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { AdminUsers, type AdminUserRow } from "./AdminUsers";
 import { AdminTemplates, type AdminTemplateRow } from "./AdminTemplates";
+import { AdminMarketing, type NotifySignupRow } from "./AdminMarketing";
 
 export function AdminShell({
   adminEmail,
   users,
   templates,
+  notifySignups,
 }: {
   adminEmail: string;
   users: AdminUserRow[];
   templates: AdminTemplateRow[];
+  notifySignups: NotifySignupRow[];
 }) {
-  const [tab, setTab] = useState<"users" | "templates">("users");
+  const [tab, setTab] = useState<"users" | "templates" | "marketing">("users");
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-[#16181D] font-sans">
@@ -35,10 +38,15 @@ export function AdminShell({
         <TabButton active={tab === "templates"} onClick={() => setTab("templates")}>
           League Templates
         </TabButton>
+        <TabButton active={tab === "marketing"} onClick={() => setTab("marketing")}>
+          Marketing
+        </TabButton>
       </div>
 
       <div className="px-4 sm:px-8 py-6 pb-16">
-        {tab === "users" ? <AdminUsers users={users} /> : <AdminTemplates templates={templates} />}
+        {tab === "users" && <AdminUsers users={users} />}
+        {tab === "templates" && <AdminTemplates templates={templates} />}
+        {tab === "marketing" && <AdminMarketing signups={notifySignups} />}
       </div>
     </div>
   );

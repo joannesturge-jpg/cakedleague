@@ -55,7 +55,10 @@ export async function getCurrentUser() {
   if (!token) return null;
   const userId = await verifySessionToken(token);
   if (!userId) return null;
-  return prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  // A block takes effect on the next request, not just the next login —
+  // treat a blocked user's existing session as logged out.
+  return user?.isBlocked ? null : user;
 }
 
 export async function getAdminUser() {

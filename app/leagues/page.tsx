@@ -1,6 +1,14 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { NotifyForm } from "./NotifyForm";
 
-export default function PublicLeaguesPage() {
+export default async function PublicLeaguesPage() {
+  const shows = await prisma.leagueTemplate.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, glyph: true },
+  });
+
   return (
     <div className="px-5 sm:px-10 py-8 sm:py-14 pb-24">
       <div className="max-w-6xl mx-auto">
@@ -69,12 +77,7 @@ export default function PublicLeaguesPage() {
               >
                 Create a private league
               </Link>
-              <Link
-                href="/signup"
-                className="px-7 py-3.5 rounded-full border border-cream/22 text-cream font-semibold text-sm hover:border-cream transition"
-              >
-                Notify me at launch
-              </Link>
+              {shows.length > 0 && <NotifyForm shows={shows} />}
             </div>
             <div className="flex gap-2.5 justify-center mt-8">
               <span className="w-3 h-3 rounded-full bg-purple block" />

@@ -11,7 +11,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   }
 
   const resend = new Resend(apiKey);
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM,
     to,
     subject: "Reset your Caked Leagues password",
@@ -21,6 +21,14 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
       <p>If you didn't request this, you can ignore this email.</p>
     `,
   });
+
+  if (error) {
+    // The Resend SDK resolves normally (doesn't throw) even when the send
+    // itself was rejected — e.g. onboarding@resend.dev can only deliver to
+    // the account owner's own address until a custom domain is verified.
+    // Log loudly so a silent "email sent" that never arrived is visible.
+    console.error(`[email] Password reset to ${to} failed:`, error);
+  }
 }
 
 function escapeHtml(s: string) {
@@ -38,7 +46,7 @@ export async function sendFeedbackEmail(text: string, from: { name: string; emai
   }
 
   const resend = new Resend(apiKey);
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM,
     to,
     replyTo: from?.email,
@@ -48,4 +56,8 @@ export async function sendFeedbackEmail(text: string, from: { name: string; emai
       <p>${escapeHtml(text).replace(/\n/g, "<br>")}</p>
     `,
   });
+
+  if (error) {
+    console.error(`[email] Feedback email to ${to} failed:`, error);
+  }
 }

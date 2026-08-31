@@ -33,7 +33,7 @@ export async function AdminDashboard() {
     );
   }
 
-  const [users, templates] = await Promise.all([
+  const [users, templates, notifySignups] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       select: {
@@ -42,6 +42,7 @@ export async function AdminDashboard() {
         email: true,
         createdAt: true,
         isAdmin: true,
+        isBlocked: true,
         _count: { select: { leagues: { where: { isActive: true } } } },
       },
     }),
@@ -49,7 +50,11 @@ export async function AdminDashboard() {
       orderBy: { createdAt: "desc" },
       include: { rules: { orderBy: { order: "asc" } } },
     }),
+    prisma.notifySignup.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { template: { select: { name: true, glyph: true } } },
+    }),
   ]);
 
-  return <AdminShell adminEmail={user.email} users={users} templates={templates} />;
+  return <AdminShell adminEmail={user.email} users={users} templates={templates} notifySignups={notifySignups} />;
 }
