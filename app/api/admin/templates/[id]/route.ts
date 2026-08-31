@@ -24,6 +24,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       .filter((c: unknown): c is string => typeof c === "string" && c.trim().length > 0)
       .map((c: string) => c.trim());
   }
+  if (Array.isArray(body.eliminatedContestants)) {
+    data.eliminatedContestants = body.eliminatedContestants.filter((c: unknown): c is string => typeof c === "string");
+  }
+  if (typeof body.draftOpenDay === "string") data.draftOpenDay = body.draftOpenDay || null;
+  if (typeof body.draftOpenTime === "string") data.draftOpenTime = body.draftOpenTime || null;
 
   const ops = [];
 

@@ -17,7 +17,10 @@ export type AdminTemplateRow = {
   isActive: boolean;
   rules: AdminTemplateRule[];
   contestants: string[];
+  eliminatedContestants: string[];
   tag: string | null;
+  draftOpenDay: string | null;
+  draftOpenTime: string | null;
 };
 
 export function AdminTemplates({
@@ -110,7 +113,14 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
   const [ruleDraft, setRuleDraft] = useState("");
   const [contestants, setContestants] = useState(template.contestants);
   const [contestantDraft, setContestantDraft] = useState("");
+  const [eliminated, setEliminated] = useState(template.eliminatedContestants);
+  const [draftOpenDay, setDraftOpenDay] = useState(template.draftOpenDay ?? "");
+  const [draftOpenTime, setDraftOpenTime] = useState(template.draftOpenTime ?? "");
   const [error, setError] = useState("");
+
+  function toggleEliminated(name: string) {
+    setEliminated((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
+  }
 
   function addRule() {
     if (!ruleDraft.trim()) return;
@@ -144,6 +154,9 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
           isActive,
           rules,
           contestants,
+          eliminatedContestants: eliminated,
+          draftOpenDay,
+          draftOpenTime,
         }),
       });
       if (res.ok) {
@@ -318,6 +331,28 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
                 onChange={setDraftMode}
               />
             </Field>
+            <Field label="Draft opens (Pacific time)">
+              <div className="flex items-center gap-2">
+                <select
+                  value={draftOpenDay}
+                  onChange={(e) => setDraftOpenDay(e.target.value)}
+                  className={fieldInput}
+                >
+                  <option value="">No day set</option>
+                  {DUE_DAYS.map((d) => (
+                    <option key={d} value={d}>
+                      {DUE_DAY_LABELS[d]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="time"
+                  value={draftOpenTime}
+                  onChange={(e) => setDraftOpenTime(e.target.value)}
+                  className={fieldInput}
+                />
+              </div>
+            </Field>
           </div>
 
           <Field label="Description shown to commissioners">
@@ -330,25 +365,47 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
             />
           </Field>
 
-          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mt-5 mb-2.5">
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mt-5 mb-1">
             CONTESTANTS ({contestants.length})
           </div>
+          <p className="text-xs text-[#8A909B] mb-2.5">
+            Mark someone eliminated once they&apos;re out — they stay listed for history but won&apos;t be
+            selectable in the following week&apos;s draft.
+          </p>
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {contestants.map((c, i) => (
-              <div key={i} className="flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-md bg-[#F8F9FB] border border-[#EDEFF3]">
-                <input
-                  value={c}
-                  onChange={(e) => setContestants((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
-                  className="w-32 py-0.5 bg-transparent border-none text-sm outline-none"
-                />
-                <button
-                  onClick={() => setContestants((prev) => prev.filter((_, j) => j !== i))}
-                  className="text-[#A7ADB8] hover:text-[#C2314E] text-base px-1"
+            {contestants.map((c, i) => {
+              const isOut = eliminated.includes(c);
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-md border ${
+                    isOut ? "bg-[#FDF2F4] border-[#F3C6CF]" : "bg-[#F8F9FB] border-[#EDEFF3]"
+                  }`}
                 >
-                  ×
-                </button>
-              </div>
-            ))}
+                  <input
+                    value={c}
+                    onChange={(e) => setContestants((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
+                    className={`w-32 py-0.5 bg-transparent border-none text-sm outline-none ${
+                      isOut ? "line-through text-[#C2314E]" : ""
+                    }`}
+                  />
+                  <button
+                    onClick={() => toggleEliminated(c)}
+                    className={`px-2 py-1 rounded text-[11px] font-bold tracking-wide flex-none ${
+                      isOut ? "bg-[#C2314E] text-white" : "bg-[#EDEFF3] text-[#5B6270] hover:bg-[#E2E4E9]"
+                    }`}
+                  >
+                    {isOut ? "OUT" : "Eliminate"}
+                  </button>
+                  <button
+                    onClick={() => setContestants((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-[#A7ADB8] hover:text-[#C2314E] text-base px-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
             {contestants.length === 0 && <p className="text-sm text-[#8A909B]">No contestants added yet.</p>}
           </div>
           <div className="flex gap-2 flex-wrap mb-1">

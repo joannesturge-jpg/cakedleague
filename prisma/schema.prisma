@@ -38,8 +38,13 @@ model LeagueTemplate {
   description    String?
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
-  contestants    String[] @default([])
-  tag            String?
+  contestants           String[] @default([])
+  eliminatedContestants String[] @default([])
+  tag                   String?
+  // Assumed Pacific time — matches the picks-due reminder's fixed-timezone
+  // approach until leagues store their own timezone.
+  draftOpenDay          String?
+  draftOpenTime         String?
 
   rules          LeagueTemplateRule[]
   leagues        League[]
