@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateInviteCode } from "@/lib/invite";
+import { sendLeagueCreatedEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -72,6 +73,8 @@ export async function POST(request: Request) {
       members: { create: { userId: user.id, role: "OWNER" } },
     },
   });
+
+  await sendLeagueCreatedEmail(user.email, user.name, league.name, league.id);
 
   return NextResponse.json({ id: league.id, inviteCode: league.inviteCode });
 }

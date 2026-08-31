@@ -83,6 +83,7 @@ model League {
   scoringPerWeek Int?
   dueDay         String
   dueTime        String
+  lastPicksReminderSentAt DateTime?
 
   draftMode            String
   draftModeDescription String?
@@ -122,9 +123,10 @@ model LeagueRule {
 }
 
 model LeagueMember {
-  id       String   @id @default(cuid())
-  role     String   @default("MEMBER")
-  joinedAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  role           String   @default("MEMBER")
+  joinedAt       DateTime @default(now())
+  notifyPicksDue Boolean  @default(true)
 
   league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   leagueId String

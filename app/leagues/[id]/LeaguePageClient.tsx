@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { DRAFT_MODE_LABELS, formatDueDate } from "@/lib/leagues";
 
 type Rule = { id: string; label: string; points: number };
-type Member = { id: string; userId: string; role: string; user: { name: string } };
+type Member = { id: string; userId: string; role: string; notifyPicksDue: boolean; user: { name: string } };
 type Template = { id: string; name: string } | null;
 type League = {
   id: string;
@@ -30,13 +30,40 @@ type League = {
 
 const MEMBER_COLORS = ["#7B2CF5", "#E85BAE", "#C8A6FF", "#FBF7F4", "#8f47ff"];
 
-export function LeaguePageClient({ league, isOwner }: { league: League; isOwner: boolean; currentUserId: string }) {
+export function LeaguePageClient({
+  league,
+  isOwner,
+  currentUserId,
+}: {
+  league: League;
+  isOwner: boolean;
+  currentUserId: string;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<"details" | "rankings" | "scoring">("details");
   const [rulesOpen, setRulesOpen] = useState(true);
   const [membersOpen, setMembersOpen] = useState(true);
   const [copyLabel, setCopyLabel] = useState("Copy link");
   const [deleting, setDeleting] = useState(false);
+
+  const myMembership = league.members.find((m) => m.userId === currentUserId);
+  const [notifyOn, setNotifyOn] = useState(myMembership?.notifyPicksDue ?? true);
+  const [notifySaving, setNotifySaving] = useState(false);
+
+  async function toggleNotify() {
+    const next = !notifyOn;
+    setNotifyOn(next);
+    setNotifySaving(true);
+    try {
+      await fetch(`/api/leagues/${league.id}/notify`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifyPicksDue: next }),
+      });
+    } finally {
+      setNotifySaving(false);
+    }
+  }
 
   const weeks = league.weeks ?? undefined;
   const scoringPerWeek = league.scoringPerWeek ?? undefined;
@@ -126,10 +153,21 @@ export function LeaguePageClient({ league, isOwner }: { league: League; isOwner:
             ))}
           </div>
 
-          <div className="flex items-center justify-between gap-4 flex-wrap p-5 rounded-2xl bg-pink/10 border border-pink/35 mb-5">
+          <div className="flex items-center justify-between gap-4 flex-wrap p-5 rounded-2xl bg-pink/10 border border-pink/35 mb-3">
             <div className="text-[10.5px] tracking-widest text-pink font-bold">PICKS DUE</div>
             <div className="font-display text-xl tracking-wide">{formatDueDate(league.dueDay, league.dueTime)}</div>
           </div>
+
+          <button
+            onClick={toggleNotify}
+            disabled={notifySaving}
+            className="w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-card border border-cream/10 mb-5 text-left disabled:opacity-60"
+          >
+            <span className={`w-10 h-6 rounded-full relative transition flex-none ${notifyOn ? "bg-pink" : "bg-cream/15"}`}>
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${notifyOn ? "left-[18px]" : "left-0.5"}`} />
+            </span>
+            <span className="text-[14.5px] text-cream/75">Email me when picks are due for this league</span>
+          </button>
 
           <div className="flex flex-col gap-3">
             <Panel

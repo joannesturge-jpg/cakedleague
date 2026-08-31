@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendLeagueJoinedEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +12,14 @@ export default async function JoinPage({ params }: { params: { code: string } })
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/join/${params.code}`);
 
-  await prisma.leagueMember.upsert({
+  const existingMembership = await prisma.leagueMember.findUnique({
     where: { leagueId_userId: { leagueId: league.id, userId: user.id } },
-    update: {},
-    create: { leagueId: league.id, userId: user.id, role: "MEMBER" },
   });
+
+  if (!existingMembership) {
+    await prisma.leagueMember.create({ data: { leagueId: league.id, userId: user.id, role: "MEMBER" } });
+    await sendLeagueJoinedEmail(user.email, user.name, league.name, league.id);
+  }
 
   redirect(`/leagues/${league.id}`);
 }

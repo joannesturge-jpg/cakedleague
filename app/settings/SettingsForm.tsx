@@ -89,6 +89,10 @@ export function SettingsForm({
             <NotifyRow label="A commissioner posts new scores" on={notifyScoring} onToggle={() => setNotifyScoring((v) => !v)} />
             <NotifyRow label="Someone joins a league I run" on={notifyInvites} onToggle={() => setNotifyInvites((v) => !v)} />
           </div>
+          <p className="text-xs text-cream/35 mt-3">
+            This is the master switch for picks-due reminders. You can also turn them off for one league at a time
+            from that league&apos;s page.
+          </p>
         </div>
 
         <button

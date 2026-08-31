@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken, hashPassword, isAdminEmail, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth";
+import { sendSignupConfirmationEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   const { email, name, password } = await request.json();
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
       isAdmin: isAdminEmail(normalizedEmail),
     },
   });
+
+  await sendSignupConfirmationEmail(user.email, user.name);
 
   const token = await createSessionToken(user.id);
   const res = NextResponse.json({ id: user.id, name: user.name, email: user.email });
