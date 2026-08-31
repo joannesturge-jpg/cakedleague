@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     },
   });
 
-  await sendSignupConfirmationEmail(user.email, user.name);
+  await sendSignupConfirmationEmail(user.email);
 
   const token = await createSessionToken(user.id);
   const res = NextResponse.json({ id: user.id, name: user.name, email: user.email });

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     include: {
       members: {
         where: { notifyPicksDue: true },
-        include: { user: { select: { email: true, name: true, notifyPicksDue: true } } },
+        include: { user: { select: { email: true, notifyPicksDue: true } } },
       },
     },
   });
@@ -42,9 +42,7 @@ export async function GET(request: Request) {
     const recipients = league.members.filter((m) => m.user.notifyPicksDue);
     const dueLabel = formatDueDate(league.dueDay, league.dueTime);
 
-    await Promise.all(
-      recipients.map((m) => sendPicksDueReminderEmail(m.user.email, m.user.name, league.name, dueLabel, league.id))
-    );
+    await Promise.all(recipients.map((m) => sendPicksDueReminderEmail(m.user.email, league.name, dueLabel, league.id)));
 
     await prisma.league.update({ where: { id: league.id }, data: { lastPicksReminderSentAt: new Date() } });
     emailsSent += recipients.length;
