@@ -22,3 +22,30 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
     `,
   });
 }
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+export async function sendFeedbackEmail(text: string, from: { name: string; email: string } | null) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const to = process.env.FEEDBACK_EMAIL;
+  const senderLine = from ? `${escapeHtml(from.name)} (${escapeHtml(from.email)})` : "someone not signed in";
+
+  if (!apiKey || !to) {
+    console.log(`[dev] Feedback from ${from ? `${from.name} (${from.email})` : "someone not signed in"}: ${text}`);
+    return;
+  }
+
+  const resend = new Resend(apiKey);
+  await resend.emails.send({
+    from: FROM,
+    to,
+    replyTo: from?.email,
+    subject: "New Caked Leagues feedback",
+    html: `
+      <p><strong>From:</strong> ${senderLine}</p>
+      <p>${escapeHtml(text).replace(/\n/g, "<br>")}</p>
+    `,
+  });
+}

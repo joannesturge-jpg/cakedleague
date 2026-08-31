@@ -26,8 +26,10 @@ in production — see `app/admin/page.tsx`).
   IPv6-only and unreachable from Vercel's build environment.
 - `JWT_SECRET` — any random string, e.g. `openssl rand -hex 32`.
 - `ADMIN_EMAILS` — comma-separated emails that get admin access.
-- `RESEND_API_KEY` — optional in dev (reset links print to the server console
-  instead of emailing). Get a key at resend.com to actually send emails.
+- `RESEND_API_KEY` — optional in dev (reset links and feedback print to the
+  server console instead of emailing). Get a key at resend.com to actually
+  send emails.
+- `FEEDBACK_EMAIL` — where "Share feedback" submissions get sent.
 - `COOKIE_DOMAIN` — set to `.cakedleagues.com` in production so one login
   works on both the main site and the admin subdomain.
 

@@ -5,11 +5,34 @@ export function FeedbackModal() {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
   function close() {
     setOpen(false);
     setSent(false);
+    setError("");
     setText("");
+  }
+
+  async function send() {
+    if (!text.trim()) return;
+    setSending(true);
+    setError("");
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't send that — try again?");
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send that — try again?");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -49,15 +72,17 @@ export function FeedbackModal() {
                   placeholder="What's on your mind?"
                   className="w-full px-4 py-3.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition resize-none"
                 />
+                {error && <p className="text-sm text-pink font-medium mt-3">{error}</p>}
                 <div className="flex items-center justify-end gap-3 mt-4">
                   <button onClick={close} className="text-sm font-semibold text-cream/50 hover:text-cream transition">
                     Cancel
                   </button>
                   <button
-                    onClick={() => text.trim() && setSent(true)}
-                    className="px-6 py-2.5 rounded-full bg-pink text-ink font-extrabold text-sm hover:bg-cream transition"
+                    onClick={send}
+                    disabled={sending || !text.trim()}
+                    className="px-6 py-2.5 rounded-full bg-pink text-ink font-extrabold text-sm hover:bg-cream transition disabled:opacity-60"
                   >
-                    Send
+                    {sending ? "Sending…" : "Send"}
                   </button>
                 </div>
               </>

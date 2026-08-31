@@ -27,7 +27,23 @@ type Rule = { label: string; points: number };
 type PrizeRow = { place: string; type: "flat" | "pct"; value: number };
 
 const PLACE_LABELS = ["1st", "2nd", "3rd", "4th"];
-const STEPS = ["Basics", "Scoring", "Draft", "Money", "Review"];
+
+// Matches the design: picking a template skips the Drafting step
+// entirely (the template already defines its drafting mechanic) — it
+// only appears when starting a league from scratch.
+const TEMPLATE_STEPS = [
+  { key: "basics", label: "Basics" },
+  { key: "scoring", label: "Scoring" },
+  { key: "money", label: "Money" },
+  { key: "review", label: "Review" },
+];
+const SCRATCH_STEPS = [
+  { key: "basics", label: "Basics" },
+  { key: "scoring", label: "Scoring" },
+  { key: "money", label: "Money" },
+  { key: "draft", label: "Drafting" },
+  { key: "review", label: "Review" },
+];
 
 export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
   const router = useRouter();
@@ -42,6 +58,9 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [ruleDraft, setRuleDraft] = useState("");
   const template = templates.find((t) => t.id === templateId) ?? null;
+  const steps = template ? TEMPLATE_STEPS : SCRATCH_STEPS;
+  const safeStep = Math.min(step, steps.length - 1);
+  const currentKey = steps[safeStep].key;
 
   const [weeks, setWeeks] = useState(8);
   const [startDate, setStartDate] = useState("");
@@ -187,28 +206,28 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
       <h1 className="font-display text-4xl sm:text-5xl tracking-wide mb-6">START A LEAGUE</h1>
 
       <div className="flex gap-2 flex-wrap mb-7">
-        {STEPS.map((label, i) => (
+        {steps.map((s, i) => (
           <button
-            key={label}
+            key={s.key}
             onClick={() => setStep(i)}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-semibold transition ${
-              i === step ? "bg-pink text-ink" : "bg-card text-cream/60 hover:text-cream"
+              i === safeStep ? "bg-pink text-ink" : "bg-card text-cream/60 hover:text-cream"
             }`}
           >
             <span
               className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                i === step ? "bg-ink/20" : "bg-cream/10"
+                i === safeStep ? "bg-ink/20" : "bg-cream/10"
               }`}
             >
               {i + 1}
             </span>
-            {label}
+            {s.label}
           </button>
         ))}
       </div>
 
       <div className="bg-card border border-cream/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
-        {step === 0 && (
+        {currentKey === "basics" && (
           <div className="flex flex-col gap-6">
             <Field label="League name">
               <input
@@ -271,7 +290,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
           </div>
         )}
 
-        {step === 1 && (
+        {currentKey === "scoring" && (
           <div className="flex flex-col gap-6">
             <div>
               <h3 className="font-display text-2xl tracking-wide mb-1">START FROM A TEMPLATE</h3>
@@ -377,7 +396,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
           </div>
         )}
 
-        {step === 2 && (
+        {currentKey === "draft" && (
           <div>
             <h3 className="font-display text-2xl tracking-wide mb-1">HOW SHOULD DRAFTING WORK?</h3>
             <p className="text-sm text-cream/58 mb-5">This is the move each member makes.</p>
@@ -418,7 +437,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
           </div>
         )}
 
-        {step === 3 && (
+        {currentKey === "money" && (
           <div className="flex flex-col gap-6">
             <div>
               <h3 className="font-display text-2xl tracking-wide mb-1">MONEY RULES</h3>
@@ -491,7 +510,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
           </div>
         )}
 
-        {step === 4 && (
+        {currentKey === "review" && (
           <div>
             <h3 className="font-display text-2xl tracking-wide mb-1">CHECK IT OVER</h3>
             <p className="text-sm text-cream/58 mb-5">Here is your league. Everything stays editable after you create it.</p>
@@ -540,15 +559,15 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
       <div className="flex items-center justify-between gap-4 mt-5 flex-wrap">
         <button
           onClick={() => setStep((s) => Math.max(0, s - 1))}
-          disabled={step === 0}
+          disabled={safeStep === 0}
           className="px-5 py-2.5 rounded-full text-sm font-semibold text-cream/60 hover:text-cream transition disabled:opacity-0"
         >
           Back
         </button>
-        {step < STEPS.length - 1 ? (
+        {safeStep < steps.length - 1 ? (
           <button
-            onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-            disabled={step === 0 && !name.trim()}
+            onClick={() => setStep((s) => Math.min(steps.length - 1, s + 1))}
+            disabled={currentKey === "basics" && !name.trim()}
             className="px-7 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-40"
           >
             Continue
