@@ -132,9 +132,9 @@ export async function sendPicksDueReminderEmail(
   const firstName = escapeHtml(name.split(" ")[0] || name);
   await send(
     to,
-    `Picks due today: ${leagueName}`,
+    `Picks due tomorrow: ${leagueName}`,
     emailShell(
-      `${firstName}, picks are due today`,
+      `${firstName}, picks are due tomorrow`,
       `<p>Your picks for <strong>${escapeHtml(leagueName)}</strong> are due ${escapeHtml(dueLabel)}. Get them in before the deadline.</p>`,
       "Submit picks",
       `${APP_URL}/leagues/${leagueId}`
