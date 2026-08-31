@@ -21,16 +21,25 @@ export type AdminTemplateRow = {
 export function AdminTemplates({ templates }: { templates: AdminTemplateRow[] }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
   async function addTemplate() {
     setCreating(true);
+    setError("");
     try {
       const res = await fetch("/api/admin/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: "New template", subject: "" }),
       });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || `Couldn't create the template (${res.status}).`);
+      }
+    } catch {
+      setError("Couldn't reach the server — check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -54,6 +63,8 @@ export function AdminTemplates({ templates }: { templates: AdminTemplateRow[] })
           + New template
         </button>
       </div>
+
+      {error && <p className="text-sm text-[#C2314E] font-medium mb-3">{error}</p>}
 
       <div className="flex flex-col gap-2.5">
         {templates.map((t) => (
@@ -86,6 +97,7 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
   const [isActive, setIsActive] = useState(template.isActive);
   const [rules, setRules] = useState(template.rules.map((r) => ({ label: r.label, points: r.points })));
   const [ruleDraft, setRuleDraft] = useState("");
+  const [error, setError] = useState("");
 
   function addRule() {
     if (!ruleDraft.trim()) return;
@@ -95,13 +107,21 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
 
   async function save() {
     setSaving(true);
+    setError("");
     try {
       const res = await fetch(`/api/admin/templates/${template.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, subject, glyph, weeks, scoringPerWeek, dueDay, draftMode, description, isActive, rules }),
       });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || `Couldn't save (${res.status}).`);
+      }
+    } catch {
+      setError("Couldn't reach the server — check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -272,7 +292,8 @@ function TemplateCard({ template }: { template: AdminTemplateRow }) {
             </button>
           </div>
 
-          <div className="flex justify-end mt-5">
+          <div className="flex items-center justify-end gap-3 mt-5">
+            {error && <p className="text-sm text-[#C2314E] font-medium">{error}</p>}
             <button
               onClick={save}
               disabled={saving}
