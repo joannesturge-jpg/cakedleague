@@ -136,6 +136,7 @@ model League {
 
   rules   LeagueRule[]
   members LeagueMember[]
+  picks   LeagueMemberPick[]
 
   @@index([ownerId])
   @@index([templateId])
@@ -164,10 +165,33 @@ model LeagueMember {
   leagueId String
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId   String
+  picks    LeagueMemberPick[]
 
   @@unique([leagueId, userId])
   @@index([leagueId])
   @@index([userId])
+}
+
+// Which contestant a member drafted, within one league. First-come,
+// first-served — a contestant can only be held by one member per league
+// (matches FREE_FOR_ALL, the only drafting mode the real templates use).
+// This is an early, unrestricted-window MVP: no pick limit per member yet,
+// and template.draftOpenDay/Time is shown to members as information only,
+// not enforced as a hard gate.
+model LeagueMemberPick {
+  id         String   @id @default(cuid())
+  contestant String
+  pickedAt   DateTime @default(now())
+
+  member   LeagueMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId String
+
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  leagueId String
+
+  @@unique([leagueId, contestant])
+  @@index([leagueId])
+  @@index([memberId])
 }
 
 model PasswordResetToken {

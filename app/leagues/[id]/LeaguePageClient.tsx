@@ -5,7 +5,15 @@ import { DRAFT_MODE_LABELS, formatDueDate } from "@/lib/leagues";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type Member = { id: string; userId: string; role: string; notifyPicksDue: boolean; user: { name: string } };
-type Template = { id: string; name: string } | null;
+type Pick = { id: string; contestant: string; memberId: string };
+type Template = {
+  id: string;
+  name: string;
+  contestants: string[];
+  eliminatedContestants: string[];
+  draftOpenDay: string | null;
+  draftOpenTime: string | null;
+} | null;
 type League = {
   id: string;
   name: string;
@@ -25,6 +33,7 @@ type League = {
   prizePlaces: number | null;
   rules: Rule[];
   members: Member[];
+  picks: Pick[];
   template: Template;
 };
 
@@ -49,6 +58,47 @@ export function LeaguePageClient({
   const myMembership = league.members.find((m) => m.userId === currentUserId);
   const [notifyOn, setNotifyOn] = useState(myMembership?.notifyPicksDue ?? true);
   const [notifySaving, setNotifySaving] = useState(false);
+
+  const [picks, setPicks] = useState(league.picks);
+  const [pickBusy, setPickBusy] = useState<string | null>(null);
+  const [pickError, setPickError] = useState("");
+
+  async function draftContestant(contestant: string) {
+    setPickBusy(contestant);
+    setPickError("");
+    try {
+      const res = await fetch(`/api/leagues/${league.id}/picks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contestant }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't draft that contestant");
+      setPicks((prev) => [...prev, data]);
+    } catch (err) {
+      setPickError(err instanceof Error ? err.message : "Couldn't draft that contestant");
+    } finally {
+      setPickBusy(null);
+    }
+  }
+
+  async function undraftContestant(contestant: string) {
+    setPickBusy(contestant);
+    setPickError("");
+    try {
+      const res = await fetch(`/api/leagues/${league.id}/picks`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contestant }),
+      });
+      if (!res.ok) throw new Error("Couldn't drop that contestant");
+      setPicks((prev) => prev.filter((p) => p.contestant !== contestant));
+    } catch (err) {
+      setPickError(err instanceof Error ? err.message : "Couldn't drop that contestant");
+    } finally {
+      setPickBusy(null);
+    }
+  }
 
   async function toggleNotify() {
     const next = !notifyOn;
@@ -223,11 +273,16 @@ export function LeaguePageClient({
               )}
             </Panel>
 
-            <div className="bg-card border border-cream/10 rounded-2xl p-6 text-center">
-              <h3 className="font-display text-xl tracking-wide mb-1.5">DRAFT POOL</h3>
-              <p className="font-script text-3xl text-pink leading-none">Not ready yet!</p>
-              <p className="text-sm text-cream/55 mt-2">Drafting is coming soon for this league.</p>
-            </div>
+            <DraftPool
+              template={league.template}
+              members={league.members}
+              picks={picks}
+              myMembershipId={myMembership?.id ?? null}
+              busy={pickBusy}
+              error={pickError}
+              onDraft={draftContestant}
+              onUndraft={undraftContestant}
+            />
           </div>
         </div>
       )}
@@ -276,6 +331,87 @@ function Panel({
         <span className="font-display text-xl text-pink leading-none">{open ? "−" : "+"}</span>
       </button>
       {open && <div className="px-6 pb-6">{children}</div>}
+    </div>
+  );
+}
+
+function DraftPool({
+  template,
+  members,
+  picks,
+  myMembershipId,
+  busy,
+  error,
+  onDraft,
+  onUndraft,
+}: {
+  template: Template;
+  members: Member[];
+  picks: Pick[];
+  myMembershipId: string | null;
+  busy: string | null;
+  error: string;
+  onDraft: (contestant: string) => void;
+  onUndraft: (contestant: string) => void;
+}) {
+  if (!template || template.contestants.length === 0) {
+    return (
+      <div className="bg-card border border-cream/10 rounded-2xl p-6 text-center">
+        <h3 className="font-display text-xl tracking-wide mb-1.5">DRAFT POOL</h3>
+        <p className="font-script text-3xl text-pink leading-none">Not ready yet!</p>
+        <p className="text-sm text-cream/55 mt-2">Drafting is coming soon for this league.</p>
+      </div>
+    );
+  }
+
+  const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
+  const memberName = (memberId: string) => members.find((m) => m.id === memberId)?.user.name ?? "Someone";
+
+  return (
+    <div className="bg-card border border-cream/10 rounded-3xl p-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+        <h3 className="font-display text-xl tracking-wide">DRAFT POOL</h3>
+        {template.draftOpenDay && template.draftOpenTime && (
+          <span className="text-[11px] text-cream/40 font-semibold">
+            Picks open {formatDueDate(template.draftOpenDay, template.draftOpenTime)} PT
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-cream/55 mb-4">
+        First come, first served — once someone drafts a contestant, they&apos;re off the board.
+      </p>
+      {error && <p className="text-sm text-pink font-medium mb-3">{error}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {active.map((c) => {
+          const pick = picks.find((p) => p.contestant === c);
+          const isMine = pick && pick.memberId === myMembershipId;
+          const isBusy = busy === c;
+          if (!pick) {
+            return (
+              <button
+                key={c}
+                onClick={() => onDraft(c)}
+                disabled={isBusy || !myMembershipId}
+                className="px-3 py-2 rounded-xl text-sm font-semibold border border-cream/15 bg-ink/40 text-cream/80 hover:border-pink transition disabled:opacity-50"
+              >
+                {isBusy ? "Drafting…" : c}
+              </button>
+            );
+          }
+          return (
+            <button
+              key={c}
+              onClick={() => (isMine ? onUndraft(c) : undefined)}
+              disabled={isBusy || !isMine}
+              className={`px-3 py-2 rounded-xl text-sm font-semibold border transition disabled:opacity-70 ${
+                isMine ? "border-pink bg-pink/15 text-pink" : "border-cream/10 bg-ink/20 text-cream/35"
+              }`}
+            >
+              {c} · {isMine ? "yours ×" : memberName(pick.memberId)}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -135,6 +135,18 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
     setContestantDraft("");
   }
 
+  async function resetPicks() {
+    if (!confirm(`Clear every drafted pick across every league on "${template.name}"? This can't be undone.`)) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}/picks`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Couldn't reset picks");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't reset picks");
+    }
+  }
+
   async function save() {
     setSaving(true);
     setError("");
@@ -422,6 +434,12 @@ function TemplateCard({ template, publicLeagueId }: { template: AdminTemplateRow
               className="px-5 py-2.5 rounded-md bg-[#16181D] text-white font-semibold text-[13.5px] hover:bg-black transition"
             >
               Add contestant
+            </button>
+            <button
+              onClick={resetPicks}
+              className="px-4 py-2.5 rounded-md border border-[#EBD3D9] bg-[#FDF2F4] text-[13.5px] font-semibold text-[#C2314E] hover:bg-[#F9E2E7] transition"
+            >
+              Reset all drafted picks
             </button>
           </div>
 

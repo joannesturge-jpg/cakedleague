@@ -15,6 +15,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
       rules: { orderBy: { order: "asc" } },
       members: { include: { user: { select: { name: true } } }, orderBy: { joinedAt: "asc" } },
       template: true,
+      picks: true,
     },
   });
 
