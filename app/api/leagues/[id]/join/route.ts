@@ -19,7 +19,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   if (!existingMembership) {
     await prisma.leagueMember.create({ data: { leagueId: league.id, userId: user.id, role: "MEMBER" } });
-    await sendLeagueJoinedEmail(user.email, league.name, league.id);
+    await sendLeagueJoinedEmail(user.email, user.id, league.name, league.id);
   }
 
   return NextResponse.json({ id: league.id });

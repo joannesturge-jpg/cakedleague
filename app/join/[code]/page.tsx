@@ -18,7 +18,7 @@ export default async function JoinPage({ params }: { params: { code: string } })
 
   if (!existingMembership) {
     await prisma.leagueMember.create({ data: { leagueId: league.id, userId: user.id, role: "MEMBER" } });
-    await sendLeagueJoinedEmail(user.email, league.name, league.id);
+    await sendLeagueJoinedEmail(user.email, user.id, league.name, league.id);
   }
 
   redirect(`/leagues/${league.id}`);

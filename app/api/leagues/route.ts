@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     },
   });
 
-  await sendLeagueCreatedEmail(user.email, user.name, league.name, league.id);
+  await sendLeagueCreatedEmail(user.email, user.id, league.name, league.id);
 
   return NextResponse.json({ id: league.id, inviteCode: league.inviteCode });
 }

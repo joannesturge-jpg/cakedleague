@@ -37,6 +37,24 @@ export async function verifySessionToken(token: string): Promise<string | null> 
   }
 }
 
+export async function createUnsubscribeToken(userId: string) {
+  return new SignJWT({ sub: userId, purpose: "unsubscribe" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("400d")
+    .sign(secretKey());
+}
+
+export async function verifyUnsubscribeToken(token: string): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, secretKey());
+    if (payload.purpose !== "unsubscribe" || typeof payload.sub !== "string") return null;
+    return payload.sub;
+  } catch {
+    return null;
+  }
+}
+
 export function sessionCookieOptions() {
   return {
     httpOnly: true,
