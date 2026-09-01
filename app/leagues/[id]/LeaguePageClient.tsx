@@ -4,7 +4,16 @@ import { useRouter } from "next/navigation";
 import { DRAFT_MODE_LABELS, formatDueDate } from "@/lib/leagues";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
-type Member = { id: string; userId: string; role: string; notifyPicksDue: boolean; user: { name: string } };
+type WeeklyPick = { id: string; week: number; topThree: string[]; songPrediction: string | null };
+type Member = {
+  id: string;
+  userId: string;
+  role: string;
+  notifyPicksDue: boolean;
+  winnerPick: string | null;
+  weeklyPicks: WeeklyPick[];
+  user: { name: string };
+};
 type Pick = { id: string; contestant: string; memberId: string };
 type Template = {
   id: string;
@@ -13,6 +22,7 @@ type Template = {
   eliminatedContestants: string[];
   draftOpenDay: string | null;
   draftOpenTime: string | null;
+  pickFormat: string;
 } | null;
 type League = {
   id: string;
@@ -97,6 +107,52 @@ export function LeaguePageClient({
       setPickError(err instanceof Error ? err.message : "Couldn't drop that contestant");
     } finally {
       setPickBusy(null);
+    }
+  }
+
+  const [winnerPick, setWinnerPick] = useState(myMembership?.winnerPick ?? null);
+  const [winnerBusy, setWinnerBusy] = useState(false);
+  const [winnerError, setWinnerError] = useState("");
+
+  async function pickWinner(contestant: string) {
+    setWinnerBusy(true);
+    setWinnerError("");
+    try {
+      const res = await fetch(`/api/leagues/${league.id}/winner-pick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contestant }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't lock in that pick");
+      setWinnerPick(data.winnerPick);
+    } catch (err) {
+      setWinnerError(err instanceof Error ? err.message : "Couldn't lock in that pick");
+    } finally {
+      setWinnerBusy(false);
+    }
+  }
+
+  const [weeklyPicks, setWeeklyPicks] = useState(myMembership?.weeklyPicks ?? []);
+  const [weekliesBusy, setWeekliesBusy] = useState(false);
+  const [weeklyError, setWeeklyError] = useState("");
+
+  async function submitWeeklyPick(week: number, topThree: string[], songPrediction: string) {
+    setWeekliesBusy(true);
+    setWeeklyError("");
+    try {
+      const res = await fetch(`/api/leagues/${league.id}/weekly-pick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week, topThree, songPrediction: songPrediction || undefined }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't save that pick");
+      setWeeklyPicks((prev) => [...prev.filter((p) => p.week !== week), data]);
+    } catch (err) {
+      setWeeklyError(err instanceof Error ? err.message : "Couldn't save that pick");
+    } finally {
+      setWeekliesBusy(false);
     }
   }
 
@@ -273,16 +329,31 @@ export function LeaguePageClient({
               )}
             </Panel>
 
-            <DraftPool
-              template={league.template}
-              members={league.members}
-              picks={picks}
-              myMembershipId={myMembership?.id ?? null}
-              busy={pickBusy}
-              error={pickError}
-              onDraft={draftContestant}
-              onUndraft={undraftContestant}
-            />
+            {league.template?.pickFormat === "WEEKLY_TOP3" ? (
+              <WeeklyPicksForm
+                template={league.template}
+                weeks={league.weeks ?? 11}
+                winnerPick={winnerPick}
+                winnerBusy={winnerBusy}
+                winnerError={winnerError}
+                onPickWinner={pickWinner}
+                weeklyPicks={weeklyPicks}
+                weekliesBusy={weekliesBusy}
+                weeklyError={weeklyError}
+                onSubmitWeekly={submitWeeklyPick}
+              />
+            ) : (
+              <DraftPool
+                template={league.template}
+                members={league.members}
+                picks={picks}
+                myMembershipId={myMembership?.id ?? null}
+                busy={pickBusy}
+                error={pickError}
+                onDraft={draftContestant}
+                onUndraft={undraftContestant}
+              />
+            )}
           </div>
         </div>
       )}
@@ -411,6 +482,141 @@ function DraftPool({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function WeeklyPicksForm({
+  template,
+  weeks,
+  winnerPick,
+  winnerBusy,
+  winnerError,
+  onPickWinner,
+  weeklyPicks,
+  weekliesBusy,
+  weeklyError,
+  onSubmitWeekly,
+}: {
+  template: Template;
+  weeks: number;
+  winnerPick: string | null;
+  winnerBusy: boolean;
+  winnerError: string;
+  onPickWinner: (contestant: string) => void;
+  weeklyPicks: WeeklyPick[];
+  weekliesBusy: boolean;
+  weeklyError: string;
+  onSubmitWeekly: (week: number, topThree: string[], songPrediction: string) => void;
+}) {
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const startingPick = weeklyPicks.find((p) => p.week === 1);
+  const [draftTop, setDraftTop] = useState<[string, string, string]>([
+    startingPick?.topThree[0] ?? "",
+    startingPick?.topThree[1] ?? "",
+    startingPick?.topThree[2] ?? "",
+  ]);
+  const [draftSong, setDraftSong] = useState(startingPick?.songPrediction ?? "");
+
+  function changeWeek(w: number) {
+    setSelectedWeek(w);
+    const p = weeklyPicks.find((x) => x.week === w);
+    setDraftTop([p?.topThree[0] ?? "", p?.topThree[1] ?? "", p?.topThree[2] ?? ""]);
+    setDraftSong(p?.songPrediction ?? "");
+  }
+
+  if (!template) return null;
+  const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
+  const existing = weeklyPicks.find((p) => p.week === selectedWeek);
+  const canSave = draftTop.every((c) => c) && new Set(draftTop).size === 3;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="bg-card border border-cream/10 rounded-3xl p-6">
+        <h3 className="font-display text-xl tracking-wide mb-1.5">SEASON WINNER</h3>
+        {winnerPick ? (
+          <p className="text-sm text-cream/70">
+            Locked in: <span className="text-pink font-semibold">{winnerPick}</span>
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-cream/55 mb-3">Pick once — this can&apos;t be changed after you save it.</p>
+            {winnerError && <p className="text-sm text-pink font-medium mb-2">{winnerError}</p>}
+            <div className="flex flex-wrap gap-1.5">
+              {active.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => onPickWinner(c)}
+                  disabled={winnerBusy}
+                  className="px-3 py-2 rounded-xl text-sm font-semibold border border-cream/15 bg-ink/40 text-cream/80 hover:border-pink transition disabled:opacity-50"
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="bg-card border border-cream/10 rounded-3xl p-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+          <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
+          <select
+            value={selectedWeek}
+            onChange={(e) => changeWeek(Number(e.target.value))}
+            className="px-3 py-2 rounded-lg bg-ink/60 border border-cream/15 text-cream text-sm outline-none"
+          >
+            {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
+              <option key={w} value={w}>
+                Week {w}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-sm text-cream/55 mb-4">Rank your top three for this week, in order.</p>
+        {weeklyError && <p className="text-sm text-pink font-medium mb-3">{weeklyError}</p>}
+        <div className="flex flex-col gap-2.5 mb-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-3">
+              <span className="w-6 text-sm font-display text-pink flex-none">{i + 1}.</span>
+              <select
+                value={draftTop[i]}
+                onChange={(e) =>
+                  setDraftTop((prev) => {
+                    const next = [...prev] as [string, string, string];
+                    next[i] = e.target.value;
+                    return next;
+                  })
+                }
+                className="flex-1 px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+              >
+                <option value="">Choose a couple</option>
+                {active.map((c) => (
+                  <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[i] !== c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-2">
+          SONG PREDICTION (OPTIONAL)
+        </label>
+        <input
+          value={draftSong}
+          onChange={(e) => setDraftSong(e.target.value)}
+          placeholder="A song you think gets used this week"
+          className="w-full px-4 py-3 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition mb-4"
+        />
+        <button
+          onClick={() => onSubmitWeekly(selectedWeek, draftTop, draftSong)}
+          disabled={!canSave || weekliesBusy}
+          className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+        >
+          {weekliesBusy ? "Saving…" : existing ? "Update picks" : "Save picks"}
+        </button>
       </div>
     </div>
   );

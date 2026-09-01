@@ -45,6 +45,10 @@ model LeagueTemplate {
   // approach until leagues store their own timezone.
   draftOpenDay          String?
   draftOpenTime         String?
+  // "ROSTER" — draft a set of contestants once, score on their individual
+  // performance (Bake Off). "WEEKLY_TOP3" — pick a season winner once, then
+  // predict a ranked top three (+ optional song) every week (DWTS).
+  pickFormat            String   @default("ROSTER")
 
   rules          LeagueTemplateRule[]
   leagues        League[]
@@ -160,12 +164,16 @@ model LeagueMember {
   role           String   @default("MEMBER")
   joinedAt       DateTime @default(now())
   notifyPicksDue Boolean  @default(true)
+  // WEEKLY_TOP3 leagues (DWTS): the season-winner pick, made once and then
+  // locked — the API refuses to change it once set.
+  winnerPick     String?
 
-  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  leagueId String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId   String
-  picks    LeagueMemberPick[]
+  league      League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  leagueId    String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  picks       LeagueMemberPick[]
+  weeklyPicks LeagueMemberWeeklyPick[]
 
   @@unique([leagueId, userId])
   @@index([leagueId])
@@ -191,6 +199,23 @@ model LeagueMemberPick {
 
   @@unique([leagueId, contestant])
   @@index([leagueId])
+  @@index([memberId])
+}
+
+// WEEKLY_TOP3 leagues (DWTS): one member's ranked top-three prediction for
+// one week, plus an optional song prediction. topThree is stored in rank
+// order (index 0 = 1st place pick).
+model LeagueMemberWeeklyPick {
+  id             String   @id @default(cuid())
+  week           Int
+  topThree       String[] @default([])
+  songPrediction String?
+  submittedAt    DateTime @default(now())
+
+  member   LeagueMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId String
+
+  @@unique([memberId, week])
   @@index([memberId])
 }
 
