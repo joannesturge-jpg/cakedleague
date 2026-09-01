@@ -54,6 +54,7 @@ model LeagueTemplate {
   leagues        League[]
   notifySignups  NotifySignup[]
   ruleAwards     LeagueTemplateRuleAward[]
+  weeklyScores   LeagueTemplateWeeklyScore[]
 }
 
 model NotifySignup {
@@ -98,6 +99,23 @@ model LeagueTemplateRuleAward {
   templateId String
 
   @@unique([ruleId, week, contestant])
+  @@index([templateId, week])
+}
+
+// WEEKLY_TOP3 templates (DWTS): the raw score you give each couple for a
+// week. The top three (ties included) are computed from these at read
+// time rather than stored — nobody has to separately toggle "correct
+// couple" / "exact order" once the scores are in.
+model LeagueTemplateWeeklyScore {
+  id         String @id @default(cuid())
+  week       Int
+  contestant String
+  score      Int    @default(0)
+
+  template   LeagueTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId String
+
+  @@unique([templateId, week, contestant])
   @@index([templateId, week])
 }
 

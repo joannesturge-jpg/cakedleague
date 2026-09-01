@@ -48,7 +48,7 @@ export async function AdminDashboard() {
     }),
     prisma.leagueTemplate.findMany({
       orderBy: { createdAt: "desc" },
-      include: { rules: { orderBy: { order: "asc" } }, ruleAwards: true },
+      include: { rules: { orderBy: { order: "asc" } }, ruleAwards: true, weeklyScores: true },
     }),
     prisma.notifySignup.findMany({
       orderBy: { createdAt: "desc" },

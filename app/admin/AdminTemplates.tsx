@@ -21,7 +21,9 @@ export type AdminTemplateRow = {
   tag: string | null;
   draftOpenDay: string | null;
   draftOpenTime: string | null;
+  pickFormat: string;
   ruleAwards: { id: string; week: number; contestant: string; ruleId: string }[];
+  weeklyScores: { id: string; week: number; contestant: string; score: number }[];
 };
 
 export function AdminTemplates({

@@ -354,6 +354,10 @@ export function LeaguePageClient({
                 onUndraft={undraftContestant}
               />
             )}
+
+            {isOwner && league.template?.pickFormat === "WEEKLY_TOP3" && (
+              <CommissionerSongPredictions members={league.members} />
+            )}
           </div>
         </div>
       )}
@@ -618,6 +622,39 @@ function WeeklyPicksForm({
           {weekliesBusy ? "Saving…" : existing ? "Update picks" : "Save picks"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function CommissionerSongPredictions({ members }: { members: Member[] }) {
+  const rows = members
+    .flatMap((m) =>
+      m.weeklyPicks
+        .filter((p) => p.songPrediction)
+        .map((p) => ({ week: p.week, member: m.user.name, song: p.songPrediction as string }))
+    )
+    .sort((a, b) => a.week - b.week);
+
+  return (
+    <div className="bg-card border border-cream/10 rounded-3xl p-6">
+      <h3 className="font-display text-xl tracking-wide mb-1.5">SONG PREDICTIONS</h3>
+      <p className="text-sm text-cream/55 mb-4">
+        You&apos;re the one who checks these — score them yourself each week.
+      </p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-cream/45">No song predictions submitted yet.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-ink/50">
+              <span className="text-sm text-cream/78">
+                Week {r.week} · {r.member}
+              </span>
+              <span className="text-sm font-medium">{r.song}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
