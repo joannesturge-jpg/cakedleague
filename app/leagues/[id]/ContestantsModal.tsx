@@ -23,6 +23,46 @@ const DWTS_CAST = [
   { name: "Julia Stiles", photo: "/dwts-cast/julia-stiles.avif" },
 ];
 
+// Small edit-distance check so a typo in the admin-entered contestant list
+// (e.g. "Harry Shun Jr." vs. the cast list's "Harry Shum Jr.") doesn't
+// silently break the pairing between a photo and a real pick.
+function levenshtein(a: string, b: string) {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function nameWords(s: string) {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && w !== "jr");
+}
+
+// Every word in the cast member's name needs a close match somewhere in
+// the contestant string — close meaning exact, or within 1-2 typo'd
+// characters depending on word length.
+function fuzzyIncludes(contestant: string, personName: string) {
+  const contestantWords = nameWords(contestant);
+  const target = nameWords(personName);
+  return (
+    target.length > 0 &&
+    target.every((w) =>
+      contestantWords.some((cw) => cw === w || levenshtein(cw, w) <= (w.length <= 4 ? 1 : 2))
+    )
+  );
+}
+
 export function ContestantsModal({
   contestants,
   eliminatedContestants,
@@ -69,7 +109,7 @@ export function ContestantsModal({
   const claimedContestants = new Set<string>();
   for (const person of DWTS_CAST) {
     const found = contestants.find(
-      (c) => !claimedContestants.has(c) && c.toLowerCase().includes(person.name.toLowerCase())
+      (c) => !claimedContestants.has(c) && fuzzyIncludes(c, person.name)
     );
     if (found) {
       castToContestant.set(person.name, found);
