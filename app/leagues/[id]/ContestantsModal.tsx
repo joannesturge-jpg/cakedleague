@@ -103,6 +103,14 @@ export function ContestantsModal({
                         {rank + 1}
                       </span>
                     )}
+                    {!isPicked && pickable && filledSlots < 3 && (
+                      <span className="absolute top-2 left-2 w-7 h-7 rounded-full border-2 border-cream/80 bg-ink/25" />
+                    )}
+                    {!isPicked && pickable && filledSlots >= 3 && (
+                      <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-cream/85 text-ink font-bold text-sm flex items-center justify-center shadow">
+                        ×
+                      </span>
+                    )}
                     {isOut && (
                       <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-ink/70">
                         <span className="text-[10px] font-bold tracking-widest text-cream/70">ELIMINATED</span>
