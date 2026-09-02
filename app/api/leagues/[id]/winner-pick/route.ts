@@ -3,9 +3,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSeasonPredictionsLocked } from "@/lib/leagues";
 
-// One-time season-winner pick for WEEKLY_TOP3 leagues. Once set, it's
-// locked — the API refuses to change it, matching "they only pick their
-// show winner in the first draft."
+// Season-winner pick for WEEKLY_TOP3 leagues. Freely changeable up until
+// the season predictions lock date — after that isSeasonPredictionsLocked()
+// refuses everything, changes included.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
@@ -25,9 +25,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     where: { leagueId_userId: { leagueId: league.id, userId: user.id } },
   });
   if (!membership) return NextResponse.json({ error: "Not a member of this league" }, { status: 403 });
-  if (membership.winnerPick) {
-    return NextResponse.json({ error: "Your season winner pick is already locked in" }, { status: 400 });
-  }
 
   if (!league.template || !league.template.contestants.includes(contestant)) {
     return NextResponse.json({ error: "That contestant isn't in this league's pool" }, { status: 400 });

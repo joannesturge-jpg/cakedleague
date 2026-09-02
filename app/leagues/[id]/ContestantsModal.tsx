@@ -82,6 +82,69 @@ export function ContestantsModal({
 
   const filledSlots = draft.filter(Boolean).length;
 
+  function personFor(contestant: string) {
+    return DWTS_CAST.find((p) => matchFor(p.name) === contestant) ?? null;
+  }
+
+  // Selected picks float to the top, in rank order, with a divider before
+  // the rest of the cast — so once you've picked, reopening the modal
+  // shows your top three first instead of making you scroll to find them.
+  const pickedPeople = draft
+    .filter(Boolean)
+    .map((c) => personFor(c))
+    .filter((p): p is (typeof DWTS_CAST)[number] => !!p);
+  const pickedNames = new Set(pickedPeople.map((p) => p.name));
+  const restPeople = DWTS_CAST.filter((p) => !pickedNames.has(p.name));
+
+  function renderCard(person: (typeof DWTS_CAST)[number]) {
+    const match = matchFor(person.name);
+    const isOut = match ? eliminatedContestants.includes(match) : false;
+    const pickable = !!match && !isOut;
+    const rank = match ? draft.indexOf(match) : -1;
+    const isPicked = rank !== -1;
+
+    return (
+      <button
+        key={person.name}
+        type="button"
+        onClick={() => pickable && match && toggle(match)}
+        disabled={!pickable}
+        className={`relative flex flex-col items-center text-center gap-2.5 rounded-2xl p-1.5 transition ${
+          pickable ? "cursor-pointer hover:bg-cream/5" : "cursor-not-allowed opacity-40"
+        }`}
+      >
+        <div className="relative w-full">
+          <img
+            src={person.photo}
+            alt={person.name}
+            className={`w-full aspect-square object-cover rounded-2xl border-2 transition ${
+              isPicked ? "border-pink" : "border-cream/10"
+            }`}
+          />
+          {isPicked && (
+            <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-pink text-ink font-display text-sm flex items-center justify-center shadow">
+              {rank + 1}
+            </span>
+          )}
+          {!isPicked && !isOut && filledSlots < 3 && (
+            <span className="absolute top-2 left-2 w-7 h-7 rounded-full border-2 border-cream/80 bg-ink/25" />
+          )}
+          {!isPicked && !isOut && filledSlots >= 3 && (
+            <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-cream/85 text-ink font-bold text-sm flex items-center justify-center shadow">
+              ×
+            </span>
+          )}
+          {isOut && (
+            <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-ink/70">
+              <span className="text-[10px] font-bold tracking-widest text-cream/70">ELIMINATED</span>
+            </span>
+          )}
+        </div>
+        <p className="text-sm font-semibold text-cream/85">{match ?? person.name}</p>
+      </button>
+    );
+  }
+
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 backdrop-blur-sm p-4"
@@ -107,54 +170,11 @@ export function ContestantsModal({
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 pt-4 pb-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {DWTS_CAST.map((person) => {
-              const match = matchFor(person.name);
-              const isOut = match ? eliminatedContestants.includes(match) : false;
-              const pickable = !!match && !isOut;
-              const rank = match ? draft.indexOf(match) : -1;
-              const isPicked = rank !== -1;
-
-              return (
-                <button
-                  key={person.name}
-                  type="button"
-                  onClick={() => pickable && match && toggle(match)}
-                  disabled={!pickable}
-                  className={`relative flex flex-col items-center text-center gap-2.5 rounded-2xl p-1.5 transition ${
-                    pickable ? "cursor-pointer hover:bg-cream/5" : "cursor-not-allowed opacity-40"
-                  }`}
-                >
-                  <div className="relative w-full">
-                    <img
-                      src={person.photo}
-                      alt={person.name}
-                      className={`w-full aspect-square object-cover rounded-2xl border-2 transition ${
-                        isPicked ? "border-pink" : "border-cream/10"
-                      }`}
-                    />
-                    {isPicked && (
-                      <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-pink text-ink font-display text-sm flex items-center justify-center shadow">
-                        {rank + 1}
-                      </span>
-                    )}
-                    {!isPicked && !isOut && filledSlots < 3 && (
-                      <span className="absolute top-2 left-2 w-7 h-7 rounded-full border-2 border-cream/80 bg-ink/25" />
-                    )}
-                    {!isPicked && !isOut && filledSlots >= 3 && (
-                      <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-cream/85 text-ink font-bold text-sm flex items-center justify-center shadow">
-                        ×
-                      </span>
-                    )}
-                    {isOut && (
-                      <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-ink/70">
-                        <span className="text-[10px] font-bold tracking-widest text-cream/70">ELIMINATED</span>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm font-semibold text-cream/85">{match ?? person.name}</p>
-                </button>
-              );
-            })}
+            {pickedPeople.map((person) => renderCard(person))}
+            {pickedPeople.length > 0 && (
+              <div className="col-span-full h-px bg-cream/15 -my-1.5" />
+            )}
+            {restPeople.map((person) => renderCard(person))}
           </div>
         </div>
         <div className="flex-none flex items-center justify-between gap-3 px-6 sm:px-8 py-4 border-t border-cream/10">

@@ -3,9 +3,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSeasonPredictionsLocked } from "@/lib/leagues";
 
-// One-time "final four" prediction for WEEKLY_TOP3 leagues — 4 contestants
-// picked before week one, +5 points each if they're right. Locked once set,
-// same rule as the season-winner pick.
+// "Final four" prediction for WEEKLY_TOP3 leagues — 4 contestants, +5
+// points each if they're right. Freely changeable up until the season
+// predictions lock date — after that isSeasonPredictionsLocked() refuses
+// everything, changes included.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
@@ -30,9 +31,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     where: { leagueId_userId: { leagueId: league.id, userId: user.id } },
   });
   if (!membership) return NextResponse.json({ error: "Not a member of this league" }, { status: 403 });
-  if (membership.finalFourPicks.length > 0) {
-    return NextResponse.json({ error: "Your final four picks are already locked in" }, { status: 400 });
-  }
 
   if (!league.template) return NextResponse.json({ error: "This league has no contestant pool" }, { status: 400 });
   for (const c of unique) {

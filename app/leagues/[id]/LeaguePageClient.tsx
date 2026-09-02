@@ -133,10 +133,12 @@ export function LeaguePageClient({
         body: JSON.stringify({ contestant }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Couldn't lock in that pick");
+      if (!res.ok) throw new Error(data?.error || "Couldn't save that pick");
       setWinnerPick(data.winnerPick);
+      return true;
     } catch (err) {
-      setWinnerError(err instanceof Error ? err.message : "Couldn't lock in that pick");
+      setWinnerError(err instanceof Error ? err.message : "Couldn't save that pick");
+      return false;
     } finally {
       setWinnerBusy(false);
     }
@@ -156,10 +158,12 @@ export function LeaguePageClient({
         body: JSON.stringify({ picks }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Couldn't lock in those picks");
+      if (!res.ok) throw new Error(data?.error || "Couldn't save those picks");
       setFinalFourPicks(data.finalFourPicks);
+      return true;
     } catch (err) {
-      setFinalFourError(err instanceof Error ? err.message : "Couldn't lock in those picks");
+      setFinalFourError(err instanceof Error ? err.message : "Couldn't save those picks");
+      return false;
     } finally {
       setFinalFourBusy(false);
     }
@@ -181,8 +185,10 @@ export function LeaguePageClient({
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Couldn't save that pick");
       setWeeklyPicks((prev) => [...prev.filter((p) => p.week !== week), data]);
+      return true;
     } catch (err) {
       setWeeklyError(err instanceof Error ? err.message : "Couldn't save that pick");
+      return false;
     } finally {
       setWeekliesBusy(false);
     }
@@ -237,7 +243,7 @@ export function LeaguePageClient({
   ];
 
   return (
-    <div className="px-5 sm:px-10 py-8 sm:py-11 pb-20 max-w-3xl mx-auto">
+    <div className="px-5 sm:px-10 py-8 sm:py-11 pb-20 max-w-[57.6rem] mx-auto">
       <div className="flex gap-6 items-center flex-wrap mb-8">
         <div
           className="w-[100px] h-[100px] rounded-3xl flex-none flex items-center justify-center text-5xl shadow-[0_18px_44px_rgba(123,44,245,.34)]"
@@ -557,25 +563,54 @@ function WeeklyPicksForm({
   winnerPick: string | null;
   winnerBusy: boolean;
   winnerError: string;
-  onPickWinner: (contestant: string) => void;
+  onPickWinner: (contestant: string) => Promise<boolean>;
   finalFourPicks: string[];
   finalFourBusy: boolean;
   finalFourError: string;
-  onSubmitFinalFour: (picks: string[]) => void;
+  onSubmitFinalFour: (picks: string[]) => Promise<boolean>;
   weeklyPicks: WeeklyPick[];
   weekliesBusy: boolean;
   weeklyError: string;
-  onSubmitWeekly: (week: number, topThree: string[], songPrediction: string) => void;
+  onSubmitWeekly: (week: number, topThree: string[], songPrediction: string) => Promise<boolean>;
 }) {
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [showContestants, setShowContestants] = useState(false);
-  const [draftFour, setDraftFour] = useState<string[]>([]);
+
+  // Season winner — editable up until the lock date. Starts in edit mode
+  // until a pick exists, then shows a saved view with an Edit pencil.
+  const [winnerEditing, setWinnerEditing] = useState(!winnerPick);
+  const [draftWinner, setDraftWinner] = useState(winnerPick ?? "");
+
+  function enterWinnerEdit() {
+    setDraftWinner(winnerPick ?? "");
+    setWinnerEditing(true);
+  }
+  async function saveWinner() {
+    if (!draftWinner) return;
+    const ok = await onPickWinner(draftWinner);
+    if (ok) setWinnerEditing(false);
+  }
+
+  // Final four — same editable-until-lock pattern as the winner pick.
+  const [fourEditing, setFourEditing] = useState(finalFourPicks.length !== 4);
+  const [draftFour, setDraftFour] = useState<string[]>(finalFourPicks.length === 4 ? finalFourPicks : []);
 
   function toggleFour(c: string) {
     setDraftFour((prev) =>
       prev.includes(c) ? prev.filter((x) => x !== c) : prev.length < 4 ? [...prev, c] : prev
     );
   }
+  function enterFourEdit() {
+    setDraftFour(finalFourPicks.length === 4 ? finalFourPicks : []);
+    setFourEditing(true);
+  }
+  async function saveFour() {
+    const ok = await onSubmitFinalFour(draftFour);
+    if (ok) setFourEditing(false);
+  }
+
+  // Weekly top-three + song prediction — same pattern, but per-week: each
+  // week starts in edit mode until that week has a saved pick.
   const startingPick = weeklyPicks.find((p) => p.week === 1);
   const [draftTop, setDraftTop] = useState<[string, string, string]>([
     startingPick?.topThree[0] ?? "",
@@ -583,12 +618,24 @@ function WeeklyPicksForm({
     startingPick?.topThree[2] ?? "",
   ]);
   const [draftSong, setDraftSong] = useState(startingPick?.songPrediction ?? "");
+  const [weeklyEditing, setWeeklyEditing] = useState(!startingPick);
 
   function changeWeek(w: number) {
     setSelectedWeek(w);
     const p = weeklyPicks.find((x) => x.week === w);
     setDraftTop([p?.topThree[0] ?? "", p?.topThree[1] ?? "", p?.topThree[2] ?? ""]);
     setDraftSong(p?.songPrediction ?? "");
+    setWeeklyEditing(!p);
+  }
+
+  function enterWeeklyEdit() {
+    setDraftTop([existing?.topThree[0] ?? "", existing?.topThree[1] ?? "", existing?.topThree[2] ?? ""]);
+    setDraftSong(existing?.songPrediction ?? "");
+    setWeeklyEditing(true);
+  }
+  async function saveWeekly() {
+    const ok = await onSubmitWeekly(selectedWeek, draftTop, draftSong);
+    if (ok) setWeeklyEditing(false);
   }
 
   function saveTopThreeFromModal(picked: string[]) {
@@ -607,84 +654,117 @@ function WeeklyPicksForm({
     <div className="flex flex-col gap-3">
       {!isSeasonPredictionsLocked() && (
         <>
-      <div className="bg-card border border-cream/10 rounded-3xl p-6">
-        <h3 className="font-display text-xl tracking-wide mb-1.5">SEASON WINNER</h3>
-        {winnerPick ? (
-          <p className="text-sm text-cream/70">
-            Locked in: <span className="text-pink font-semibold">{winnerPick}</span>
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-cream/55 mb-3">Pick once — this can&apos;t be changed after you save it.</p>
-            {winnerError && <p className="text-sm text-pink font-medium mb-2">{winnerError}</p>}
-            <div className="flex flex-wrap gap-1.5">
-              {active.map((c) => (
+          <div className="bg-card border border-cream/10 rounded-3xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <h3 className="font-display text-xl tracking-wide">SEASON WINNER</h3>
+              {!winnerEditing && (
                 <button
-                  key={c}
-                  onClick={() => onPickWinner(c)}
-                  disabled={winnerBusy}
-                  className="px-3 py-2 rounded-xl text-sm font-semibold border border-cream/15 bg-ink/40 text-cream/80 hover:border-pink transition disabled:opacity-50"
+                  onClick={enterWinnerEdit}
+                  className="text-xs font-semibold text-cream/55 hover:text-pink transition flex items-center gap-1"
                 >
-                  {c}
+                  <span aria-hidden>✎</span> Edit
                 </button>
-              ))}
+              )}
             </div>
-          </>
-        )}
-      </div>
-
-      <div className="bg-card border border-cream/10 rounded-3xl p-6">
-        <h3 className="font-display text-xl tracking-wide mb-1.5">FINAL FOUR PREDICTIONS</h3>
-        {finalFourPicks.length === 4 ? (
-          <>
-            <p className="text-sm text-cream/70 mb-2.5">Locked in:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {finalFourPicks.map((c) => (
-                <span
-                  key={c}
-                  className="px-3 py-2 rounded-xl text-sm font-semibold border border-pink bg-pink/15 text-pink"
+            {!winnerEditing ? (
+              <p className="text-sm text-cream/70">
+                Your pick: <span className="text-pink font-semibold">{winnerPick}</span>
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-cream/55 mb-3">
+                  You can change this until Sept 15 at 5:00 PM PT — after that it locks for good.
+                </p>
+                {winnerError && <p className="text-sm text-pink font-medium mb-2">{winnerError}</p>}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {active.map((c) => {
+                    const selected = draftWinner === c;
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => setDraftWinner(c)}
+                        className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                          selected
+                            ? "border-pink bg-pink/15 text-pink"
+                            : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
+                        }`}
+                      >
+                        {selected ? "✓ " : ""}
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={saveWinner}
+                  disabled={!draftWinner || winnerBusy}
+                  className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
                 >
-                  {c}
-                </span>
-              ))}
+                  {winnerBusy ? "Saving…" : "Save"}
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="bg-card border border-cream/10 rounded-3xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <h3 className="font-display text-xl tracking-wide">FINAL FOUR PREDICTIONS</h3>
+              {!fourEditing && (
+                <button
+                  onClick={enterFourEdit}
+                  className="text-xs font-semibold text-cream/55 hover:text-pink transition flex items-center gap-1"
+                >
+                  <span aria-hidden>✎</span> Edit
+                </button>
+              )}
             </div>
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-cream/55 mb-3">
-              Pick your final four before week one — +5 points for every one you get right. Pick once — this
-              can&apos;t be changed after you save it.
-            </p>
-            {finalFourError && <p className="text-sm text-pink font-medium mb-2">{finalFourError}</p>}
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {active.map((c) => {
-                const selected = draftFour.includes(c);
-                return (
-                  <button
+            {!fourEditing ? (
+              <div className="flex flex-wrap gap-1.5">
+                {finalFourPicks.map((c) => (
+                  <span
                     key={c}
-                    onClick={() => toggleFour(c)}
-                    className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
-                      selected
-                        ? "border-pink bg-pink/15 text-pink"
-                        : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
-                    }`}
+                    className="px-3 py-2 rounded-xl text-sm font-semibold border border-pink bg-pink/15 text-pink"
                   >
-                    {selected ? "✓ " : ""}
                     {c}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => onSubmitFinalFour(draftFour)}
-              disabled={draftFour.length !== 4 || finalFourBusy}
-              className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
-            >
-              {finalFourBusy ? "Locking in…" : `Lock in final four (${draftFour.length}/4)`}
-            </button>
-          </>
-        )}
-      </div>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-cream/55 mb-3">
+                  +5 points for every one you get right. You can change these until Sept 15 at 5:00 PM PT — after
+                  that they lock for good.
+                </p>
+                {finalFourError && <p className="text-sm text-pink font-medium mb-2">{finalFourError}</p>}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {active.map((c) => {
+                    const selected = draftFour.includes(c);
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => toggleFour(c)}
+                        className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                          selected
+                            ? "border-pink bg-pink/15 text-pink"
+                            : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
+                        }`}
+                      >
+                        {selected ? "✓ " : ""}
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={saveFour}
+                  disabled={draftFour.length !== 4 || finalFourBusy}
+                  className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+                >
+                  {finalFourBusy ? "Saving…" : `Save (${draftFour.length}/4)`}
+                </button>
+              </>
+            )}
+          </div>
         </>
       )}
 
@@ -692,12 +772,14 @@ function WeeklyPicksForm({
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
           <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowContestants(true)}
-              className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
-            >
-              See Contestants
-            </button>
+            {weeklyEditing && (
+              <button
+                onClick={() => setShowContestants(true)}
+                className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
+              >
+                See Contestants
+              </button>
+            )}
             <select
               value={selectedWeek}
               onChange={(e) => changeWeek(Number(e.target.value))}
@@ -720,49 +802,75 @@ function WeeklyPicksForm({
             onClose={() => setShowContestants(false)}
           />
         )}
-        <p className="text-sm text-cream/55 mb-4">Rank your top three for this week, in order.</p>
-        {weeklyError && <p className="text-sm text-pink font-medium mb-3">{weeklyError}</p>}
-        <div className="flex flex-col gap-2.5 mb-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className="w-6 text-sm font-display text-pink flex-none">{i + 1}.</span>
-              <select
-                value={draftTop[i]}
-                onChange={(e) =>
-                  setDraftTop((prev) => {
-                    const next = [...prev] as [string, string, string];
-                    next[i] = e.target.value;
-                    return next;
-                  })
-                }
-                className="flex-1 px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+        {!weeklyEditing && existing ? (
+          <>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <p className="text-sm text-cream/55">Your picks for this week:</p>
+              <button
+                onClick={enterWeeklyEdit}
+                className="text-xs font-semibold text-cream/55 hover:text-pink transition flex items-center gap-1"
               >
-                <option value="">Choose a couple</option>
-                {active.map((c) => (
-                  <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[i] !== c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+                <span aria-hidden>✎</span> Edit
+              </button>
             </div>
-          ))}
-        </div>
-        <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-2">
-          SONG PREDICTION (OPTIONAL)
-        </label>
-        <input
-          value={draftSong}
-          onChange={(e) => setDraftSong(e.target.value)}
-          placeholder="A song you think gets used this week"
-          className="w-full px-4 py-3 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition mb-4"
-        />
-        <button
-          onClick={() => onSubmitWeekly(selectedWeek, draftTop, draftSong)}
-          disabled={!canSave || weekliesBusy}
-          className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
-        >
-          {weekliesBusy ? "Saving…" : existing ? "Update picks" : "Save picks"}
-        </button>
+            <ol className="flex flex-col gap-1 mb-2">
+              {existing.topThree.map((c, i) => (
+                <li key={i} className="text-sm text-cream/78">
+                  {i + 1}. {c}
+                </li>
+              ))}
+            </ol>
+            {existing.songPrediction && (
+              <p className="text-xs text-cream/50">Song: {existing.songPrediction}</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-cream/55 mb-4">Rank your top three for this week, in order.</p>
+            {weeklyError && <p className="text-sm text-pink font-medium mb-3">{weeklyError}</p>}
+            <div className="flex flex-col gap-2.5 mb-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="w-6 text-sm font-display text-pink flex-none">{i + 1}.</span>
+                  <select
+                    value={draftTop[i]}
+                    onChange={(e) =>
+                      setDraftTop((prev) => {
+                        const next = [...prev] as [string, string, string];
+                        next[i] = e.target.value;
+                        return next;
+                      })
+                    }
+                    className="flex-1 px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                  >
+                    <option value="">Choose a couple</option>
+                    {active.map((c) => (
+                      <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[i] !== c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-2">
+              SONG PREDICTION (OPTIONAL)
+            </label>
+            <input
+              value={draftSong}
+              onChange={(e) => setDraftSong(e.target.value)}
+              placeholder="A song you think gets used this week"
+              className="w-full px-4 py-3 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition mb-4"
+            />
+            <button
+              onClick={saveWeekly}
+              disabled={!canSave || weekliesBusy}
+              className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+            >
+              {weekliesBusy ? "Saving…" : existing ? "Save" : "Save picks"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

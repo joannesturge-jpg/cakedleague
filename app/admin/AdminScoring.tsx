@@ -413,21 +413,6 @@ function WeeklyTop3Scoring({
         />
       )}
 
-      <div className="flex items-center justify-between gap-3 px-[18px] py-3.5 bg-white border border-[#E2E4E9] rounded-lg">
-        <span className="text-[13px] text-[#5B6270]">
-          {pendingCount === 0
-            ? "No changes to submit"
-            : `${pendingCount} change${pendingCount === 1 ? "" : "s"} ready to submit`}
-        </span>
-        <button
-          onClick={() => onSubmitWeek(scoreChanges, awardChanges)}
-          disabled={pendingCount === 0 || busyKey === "submit"}
-          className="px-5 py-2.5 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
-        >
-          {busyKey === "submit" ? "Submitting…" : `Submit Week ${week}`}
-        </button>
-      </div>
-
       <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
         <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">COUPLE ELIMINATED</div>
         <div className="flex flex-wrap gap-1.5">
@@ -448,6 +433,21 @@ function WeeklyTop3Scoring({
             );
           })}
         </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 px-[18px] py-3.5 bg-white border border-[#E2E4E9] rounded-lg">
+        <span className="text-[13px] text-[#5B6270]">
+          {pendingCount === 0
+            ? "No changes to submit"
+            : `${pendingCount} change${pendingCount === 1 ? "" : "s"} ready to submit`}
+        </span>
+        <button
+          onClick={() => onSubmitWeek(scoreChanges, awardChanges)}
+          disabled={pendingCount === 0 || busyKey === "submit"}
+          className="px-5 py-2.5 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+        >
+          {busyKey === "submit" ? "Submitting…" : `Submit Week ${week}`}
+        </button>
       </div>
     </div>
   );
@@ -547,6 +547,7 @@ function SeasonPredictionsAnswerKey({
   onSaveActualResults: (payload: { actualFinalFour?: string[]; actualWinner?: string }) => void;
 }) {
   const [picking, setPicking] = useState<string[]>([]);
+  const [pickedWinner, setPickedWinner] = useState<string | null>(null);
   const finalFourLocked = template.actualFinalFour.length > 0;
   const winnerLocked = !!template.actualWinner;
 
@@ -620,18 +621,34 @@ function SeasonPredictionsAnswerKey({
             ✓ {template.actualWinner}
           </span>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {template.contestants.map((c) => (
-              <button
-                key={c}
-                onClick={() => onSaveActualResults({ actualWinner: c })}
-                disabled={busyKey === "actual:winner"}
-                className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold border bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple transition disabled:opacity-50"
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
+              {template.contestants.map((c) => {
+                const selected = pickedWinner === c;
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setPickedWinner(c)}
+                    className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                      selected
+                        ? "bg-purple/10 border-purple text-purple"
+                        : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                    }`}
+                  >
+                    {selected ? "✓ " : ""}
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => pickedWinner && onSaveActualResults({ actualWinner: pickedWinner })}
+              disabled={!pickedWinner || busyKey === "actual:winner"}
+              className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+            >
+              {busyKey === "actual:winner" ? "Locking in…" : "Lock in season winner"}
+            </button>
+          </>
         )}
       </div>
     </div>
