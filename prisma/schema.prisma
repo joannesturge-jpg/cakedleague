@@ -41,6 +41,11 @@ model LeagueTemplate {
   contestants           String[] @default([])
   eliminatedContestants String[] @default([])
   tag                   String?
+  // WEEKLY_TOP3 (DWTS) answer key, filled in by admin once the real
+  // results are known. Each locks after its first save — see
+  // /api/admin/templates/[id]/actual-results.
+  actualFinalFour       String[] @default([])
+  actualWinner          String?
   // Assumed Pacific time — matches the picks-due reminder's fixed-timezone
   // approach until leagues store their own timezone.
   draftOpenDay          String?
@@ -185,6 +190,9 @@ model LeagueMember {
   // WEEKLY_TOP3 leagues (DWTS): the season-winner pick, made once and then
   // locked — the API refuses to change it once set.
   winnerPick     String?
+  // Pre-season prediction of the final four, made once and then locked —
+  // same rule as winnerPick. +5 points per correct name once scored.
+  finalFourPicks String[] @default([])
 
   league      League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   leagueId    String

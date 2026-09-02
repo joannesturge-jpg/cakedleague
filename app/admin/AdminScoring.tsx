@@ -16,6 +16,8 @@ export type AdminScoringTemplate = {
   rules: AdminScoringRule[];
   ruleAwards: AdminRuleAward[];
   weeklyScores: AdminWeeklyScore[];
+  actualFinalFour: string[];
+  actualWinner: string | null;
 };
 
 // Rules whose scoring now comes from the ranked-score grid instead of a
@@ -80,6 +82,29 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save that score");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function saveActualResults(payload: { actualFinalFour?: string[]; actualWinner?: string }) {
+    if (!template) return;
+    const key = payload.actualWinner ? "actual:winner" : "actual:finalFour";
+    setBusyKey(key);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}/actual-results`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Couldn't save that");
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that");
     } finally {
       setBusyKey(null);
     }
@@ -172,6 +197,7 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
           onToggleAward={toggleAward}
           isAwarded={isAwarded}
           onToggleEliminated={toggleEliminated}
+          onSaveActualResults={saveActualResults}
         />
       ) : (
         <RulesScoring
@@ -253,6 +279,7 @@ function WeeklyTop3Scoring({
   onToggleAward,
   isAwarded,
   onToggleEliminated,
+  onSaveActualResults,
 }: {
   template: AdminScoringTemplate;
   week: number;
@@ -262,6 +289,7 @@ function WeeklyTop3Scoring({
   onToggleAward: (ruleId: string, contestant: string) => void;
   isAwarded: (ruleId: string, contestant: string) => boolean;
   onToggleEliminated: (contestant: string) => void;
+  onSaveActualResults: (payload: { actualFinalFour?: string[]; actualWinner?: string }) => void;
 }) {
   const scoresThisWeek = template.weeklyScores.filter((s) => s.week === week);
   const scoreOf = (c: string) => scoresThisWeek.find((s) => s.contestant === c)?.score ?? 0;
@@ -274,7 +302,13 @@ function WeeklyTop3Scoring({
 
   return (
     <div className="flex flex-col gap-3.5">
-      <div className="bg-white border border-[#E2E4E9] rounded-b-lg p-[18px]">
+      <SeasonPredictionsAnswerKey
+        template={template}
+        busyKey={busyKey}
+        onSaveActualResults={onSaveActualResults}
+      />
+
+      <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
         <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SCORE EVERY COUPLE</div>
         <p className="text-xs text-[#8A909B] mb-3">
           Enter each couple&apos;s score for the week — the top three (ties included) are ranked automatically below.
@@ -347,6 +381,112 @@ function WeeklyTop3Scoring({
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// The real-world answer key for the pre-season "final four" and season
+// winner predictions members lock in once. Not tied to the week selector
+// above — the real results land whenever the show actually gets there, so
+// this stays visible and editable (until locked) no matter which week is
+// selected.
+function SeasonPredictionsAnswerKey({
+  template,
+  busyKey,
+  onSaveActualResults,
+}: {
+  template: AdminScoringTemplate;
+  busyKey: string | null;
+  onSaveActualResults: (payload: { actualFinalFour?: string[]; actualWinner?: string }) => void;
+}) {
+  const [picking, setPicking] = useState<string[]>([]);
+  const finalFourLocked = template.actualFinalFour.length > 0;
+  const winnerLocked = !!template.actualWinner;
+
+  function toggle(c: string) {
+    setPicking((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : prev.length < 4 ? [...prev, c] : prev
+    );
+  }
+
+  return (
+    <div className="bg-white border border-[#E2E4E9] rounded-b-lg p-[18px]">
+      <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">
+        SEASON PREDICTIONS — ANSWER KEY
+      </div>
+      <p className="text-xs text-[#8A909B] mb-3">
+        Each of these can only be set once — pick them whenever the real result is known. Members predicted the
+        final four for +5 points each and the season winner once, before week one.
+      </p>
+
+      <div className="mb-4">
+        <div className="text-[13px] font-semibold text-[#16181D] mb-2">
+          Actual final four {finalFourLocked ? "" : `(${picking.length}/4)`}
+        </div>
+        {finalFourLocked ? (
+          <div className="flex flex-wrap gap-1.5">
+            {template.actualFinalFour.map((c) => (
+              <span
+                key={c}
+                className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold bg-[#EEF8F1] border border-[#1E7B45]/40 text-[#1E7B45]"
+              >
+                ✓ {c}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
+              {template.contestants.map((c) => {
+                const selected = picking.includes(c);
+                return (
+                  <button
+                    key={c}
+                    onClick={() => toggle(c)}
+                    className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                      selected
+                        ? "bg-purple/10 border-purple text-purple"
+                        : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                    }`}
+                  >
+                    {selected ? "✓ " : ""}
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => onSaveActualResults({ actualFinalFour: picking })}
+              disabled={picking.length !== 4 || busyKey === "actual:finalFour"}
+              className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+            >
+              {busyKey === "actual:finalFour" ? "Locking in…" : "Lock in final four"}
+            </button>
+          </>
+        )}
+      </div>
+
+      <div>
+        <div className="text-[13px] font-semibold text-[#16181D] mb-2">Actual season winner</div>
+        {winnerLocked ? (
+          <span className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold bg-[#EEF8F1] border border-[#1E7B45]/40 text-[#1E7B45] inline-block">
+            ✓ {template.actualWinner}
+          </span>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {template.contestants.map((c) => (
+              <button
+                key={c}
+                onClick={() => onSaveActualResults({ actualWinner: c })}
+                disabled={busyKey === "actual:winner"}
+                className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold border bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple transition disabled:opacity-50"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

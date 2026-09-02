@@ -12,6 +12,7 @@ type Member = {
   role: string;
   notifyPicksDue: boolean;
   winnerPick: string | null;
+  finalFourPicks: string[];
   weeklyPicks: WeeklyPick[];
   user: { name: string };
 };
@@ -131,6 +132,29 @@ export function LeaguePageClient({
       setWinnerError(err instanceof Error ? err.message : "Couldn't lock in that pick");
     } finally {
       setWinnerBusy(false);
+    }
+  }
+
+  const [finalFourPicks, setFinalFourPicks] = useState(myMembership?.finalFourPicks ?? []);
+  const [finalFourBusy, setFinalFourBusy] = useState(false);
+  const [finalFourError, setFinalFourError] = useState("");
+
+  async function submitFinalFour(picks: string[]) {
+    setFinalFourBusy(true);
+    setFinalFourError("");
+    try {
+      const res = await fetch(`/api/leagues/${league.id}/final-four-pick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ picks }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't lock in those picks");
+      setFinalFourPicks(data.finalFourPicks);
+    } catch (err) {
+      setFinalFourError(err instanceof Error ? err.message : "Couldn't lock in those picks");
+    } finally {
+      setFinalFourBusy(false);
     }
   }
 
@@ -343,6 +367,10 @@ export function LeaguePageClient({
                 winnerBusy={winnerBusy}
                 winnerError={winnerError}
                 onPickWinner={pickWinner}
+                finalFourPicks={finalFourPicks}
+                finalFourBusy={finalFourBusy}
+                finalFourError={finalFourError}
+                onSubmitFinalFour={submitFinalFour}
                 weeklyPicks={weeklyPicks}
                 weekliesBusy={weekliesBusy}
                 weeklyError={weeklyError}
@@ -508,6 +536,10 @@ function WeeklyPicksForm({
   winnerBusy,
   winnerError,
   onPickWinner,
+  finalFourPicks,
+  finalFourBusy,
+  finalFourError,
+  onSubmitFinalFour,
   weeklyPicks,
   weekliesBusy,
   weeklyError,
@@ -519,6 +551,10 @@ function WeeklyPicksForm({
   winnerBusy: boolean;
   winnerError: string;
   onPickWinner: (contestant: string) => void;
+  finalFourPicks: string[];
+  finalFourBusy: boolean;
+  finalFourError: string;
+  onSubmitFinalFour: (picks: string[]) => void;
   weeklyPicks: WeeklyPick[];
   weekliesBusy: boolean;
   weeklyError: string;
@@ -526,6 +562,13 @@ function WeeklyPicksForm({
 }) {
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [showContestants, setShowContestants] = useState(false);
+  const [draftFour, setDraftFour] = useState<string[]>([]);
+
+  function toggleFour(c: string) {
+    setDraftFour((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : prev.length < 4 ? [...prev, c] : prev
+    );
+  }
   const startingPick = weeklyPicks.find((p) => p.week === 1);
   const [draftTop, setDraftTop] = useState<[string, string, string]>([
     startingPick?.topThree[0] ?? "",
@@ -577,6 +620,59 @@ function WeeklyPicksForm({
                 </button>
               ))}
             </div>
+          </>
+        )}
+      </div>
+
+      <div className="bg-card border border-cream/10 rounded-3xl p-6">
+        <h3 className="font-display text-xl tracking-wide mb-1.5">FINAL FOUR PREDICTIONS</h3>
+        {finalFourPicks.length === 4 ? (
+          <>
+            <p className="text-sm text-cream/70 mb-2.5">Locked in:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {finalFourPicks.map((c) => (
+                <span
+                  key={c}
+                  className="px-3 py-2 rounded-xl text-sm font-semibold border border-pink bg-pink/15 text-pink"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-cream/55 mb-3">
+              Pick your final four before week one — +5 points for every one you get right. Pick once — this
+              can&apos;t be changed after you save it.
+            </p>
+            {finalFourError && <p className="text-sm text-pink font-medium mb-2">{finalFourError}</p>}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {active.map((c) => {
+                const selected = draftFour.includes(c);
+                return (
+                  <button
+                    key={c}
+                    onClick={() => toggleFour(c)}
+                    className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                      selected
+                        ? "border-pink bg-pink/15 text-pink"
+                        : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
+                    }`}
+                  >
+                    {selected ? "✓ " : ""}
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => onSubmitFinalFour(draftFour)}
+              disabled={draftFour.length !== 4 || finalFourBusy}
+              className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+            >
+              {finalFourBusy ? "Locking in…" : `Lock in final four (${draftFour.length}/4)`}
+            </button>
           </>
         )}
       </div>
@@ -671,8 +767,10 @@ function SubmissionsTab({
   myMembershipId: string | null;
 }) {
   const [week, setWeek] = useState(1);
-  const myPick = members.find((m) => m.id === myMembershipId)?.weeklyPicks.find((p) => p.week === week);
+  const me = members.find((m) => m.id === myMembershipId);
+  const myPick = me?.weeklyPicks.find((p) => p.week === week);
   const unlocked = !!myPick;
+  const seasonPredictionsUnlocked = !!me?.winnerPick && me.finalFourPicks.length === 4;
 
   return (
     <div>
@@ -680,6 +778,49 @@ function SubmissionsTab({
         <div>
           <p className="font-script text-3xl text-pink leading-none mb-0.5">the tea</p>
           <h1 className="font-display text-3xl tracking-wide">SUBMISSIONS</h1>
+        </div>
+      </div>
+
+      <div className="bg-card border border-cream/10 rounded-3xl p-6 mb-5">
+        <h3 className="font-display text-xl tracking-wide mb-1.5">SEASON PREDICTIONS</h3>
+        {!seasonPredictionsUnlocked ? (
+          <p className="text-sm text-cream/55">
+            Lock in your season winner and final four picks on the Details tab to see everyone else&apos;s.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {members.map((m) => {
+              const isMe = m.id === myMembershipId;
+              return (
+                <div
+                  key={m.id}
+                  className={`p-4 rounded-2xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-ink/40"}`}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-display text-base tracking-wide">{m.user.name}</span>
+                    {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
+                  </div>
+                  {m.winnerPick && m.finalFourPicks.length === 4 ? (
+                    <>
+                      <p className="text-sm text-cream/78 mb-1">
+                        Winner: <span className="font-semibold">{m.winnerPick}</span>
+                      </p>
+                      <p className="text-sm text-cream/78">Final four: {m.finalFourPicks.join(", ")}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-cream/40">Not submitted yet.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+        <div>
+          <p className="font-script text-3xl text-pink leading-none mb-0.5">weekly</p>
+          <h2 className="font-display text-2xl tracking-wide">WEEK BY WEEK</h2>
         </div>
         <select
           value={week}

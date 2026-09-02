@@ -40,12 +40,22 @@ export function ContestantsModal({
   useEffect(() => setMounted(true), []);
 
   // A working copy — closing via the X or the backdrop discards it, only
-  // the Save button pushes it back up.
-  const [draft, setDraft] = useState<string[]>(() => {
-    const seeded = [...initialSelected];
+  // the Save button pushes it back up. Seeded on first paint from
+  // initialSelected, then re-synced any time that prop's value actually
+  // changes — so this can never show a stale pick, even if a future change
+  // keeps this component mounted across opens instead of remounting it.
+  function seedDraft(source: string[]) {
+    const seeded = [...source];
     while (seeded.length < 3) seeded.push("");
     return seeded.slice(0, 3);
-  });
+  }
+  const [draft, setDraft] = useState<string[]>(() => seedDraft(initialSelected));
+  const selectedKey = initialSelected.join("|");
+  const [syncedKey, setSyncedKey] = useState(selectedKey);
+  if (selectedKey !== syncedKey) {
+    setSyncedKey(selectedKey);
+    setDraft(seedDraft(initialSelected));
+  }
 
   if (!mounted) return null;
 

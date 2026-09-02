@@ -24,6 +24,8 @@ export type AdminTemplateRow = {
   pickFormat: string;
   ruleAwards: { id: string; week: number; contestant: string; ruleId: string }[];
   weeklyScores: { id: string; week: number; contestant: string; score: number }[];
+  actualFinalFour: string[];
+  actualWinner: string | null;
 };
 
 export function AdminTemplates({
