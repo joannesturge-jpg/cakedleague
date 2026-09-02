@@ -660,7 +660,7 @@ function WeeklyPicksForm({
               {!winnerEditing && (
                 <button
                   onClick={enterWinnerEdit}
-                  className="text-xs font-semibold text-cream/55 hover:text-pink transition flex items-center gap-1"
+                  className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
                 >
                   <span aria-hidden>✎</span> Edit
                 </button>
@@ -712,7 +712,7 @@ function WeeklyPicksForm({
               {!fourEditing && (
                 <button
                   onClick={enterFourEdit}
-                  className="text-xs font-semibold text-cream/55 hover:text-pink transition flex items-center gap-1"
+                  className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
                 >
                   <span aria-hidden>✎</span> Edit
                 </button>
@@ -770,16 +770,8 @@ function WeeklyPicksForm({
 
       <div className="bg-card border border-cream/10 rounded-3xl p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-          <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
-          <div className="flex items-center gap-2">
-            {weeklyEditing && (
-              <button
-                onClick={() => setShowContestants(true)}
-                className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
-              >
-                See Contestants
-              </button>
-            )}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
             <select
               value={selectedWeek}
               onChange={(e) => changeWeek(Number(e.target.value))}
@@ -792,6 +784,23 @@ function WeeklyPicksForm({
               ))}
             </select>
           </div>
+          {weeklyEditing ? (
+            <button
+              onClick={() => setShowContestants(true)}
+              className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
+            >
+              See Contestants
+            </button>
+          ) : (
+            existing && (
+              <button
+                onClick={enterWeeklyEdit}
+                className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
+              >
+                <span aria-hidden>✎</span> Edit
+              </button>
+            )
+          )}
         </div>
         {showContestants && (
           <ContestantsModal
@@ -804,15 +813,7 @@ function WeeklyPicksForm({
         )}
         {!weeklyEditing && existing ? (
           <>
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <p className="text-sm text-cream/55">Your picks for this week:</p>
-              <button
-                onClick={enterWeeklyEdit}
-                className="text-xs font-semibold text-cream/55 hover:text-pink transition flex items-center gap-1"
-              >
-                <span aria-hidden>✎</span> Edit
-              </button>
-            </div>
+            <p className="text-sm text-cream/55 mb-3 mt-3">Your picks for this week:</p>
             <ol className="flex flex-col gap-1 mb-2">
               {existing.topThree.map((c, i) => (
                 <li key={i} className="text-sm text-cream/78">
