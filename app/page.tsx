@@ -55,7 +55,7 @@ export default async function HomePage() {
               <br />
               ANYTHING
             </h1>
-            <p className="font-script text-3xl sm:text-5xl text-pink mt-2 mb-6 leading-none">even the weird stuff</p>
+            <p className="font-script text-3xl sm:text-5xl text-pink mt-2 mb-6 leading-none">even the niche stuff</p>
 
             <p className="text-lg text-cream/70 max-w-lg mb-8 leading-relaxed">
               Bake Off. Dancing with the Stars. Survivor. Your cousin&apos;s bowling league. If nobody built the app
