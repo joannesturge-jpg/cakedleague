@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DRAFT_MODE_LABELS, formatDueDate } from "@/lib/leagues";
+import { ContestantsModal } from "./ContestantsModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type WeeklyPick = { id: string; week: number; topThree: string[]; songPrediction: string | null };
@@ -524,6 +525,7 @@ function WeeklyPicksForm({
   onSubmitWeekly: (week: number, topThree: string[], songPrediction: string) => void;
 }) {
   const [selectedWeek, setSelectedWeek] = useState(1);
+  const [showContestants, setShowContestants] = useState(false);
   const startingPick = weeklyPicks.find((p) => p.week === 1);
   const [draftTop, setDraftTop] = useState<[string, string, string]>([
     startingPick?.topThree[0] ?? "",
@@ -575,18 +577,29 @@ function WeeklyPicksForm({
       <div className="bg-card border border-cream/10 rounded-3xl p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
           <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
-          <select
-            value={selectedWeek}
-            onChange={(e) => changeWeek(Number(e.target.value))}
-            className="px-3 py-2 rounded-lg bg-ink/60 border border-cream/15 text-cream text-sm outline-none"
-          >
-            {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
-              <option key={w} value={w}>
-                Week {w}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowContestants(true)}
+              className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
+            >
+              See Contestants
+            </button>
+            <select
+              value={selectedWeek}
+              onChange={(e) => changeWeek(Number(e.target.value))}
+              className="px-3 py-2 rounded-lg bg-ink/60 border border-cream/15 text-cream text-sm outline-none"
+            >
+              {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
+                <option key={w} value={w}>
+                  Week {w}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+        {showContestants && (
+          <ContestantsModal contestants={template.contestants} onClose={() => setShowContestants(false)} />
+        )}
         <p className="text-sm text-cream/55 mb-4">Rank your top three for this week, in order.</p>
         {weeklyError && <p className="text-sm text-pink font-medium mb-3">{weeklyError}</p>}
         <div className="flex flex-col gap-2.5 mb-4">
