@@ -36,33 +36,37 @@ export function ContestantsModal({ contestants, onClose }: { contestants: string
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center bg-ink/80 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <div
-        className="relative bg-card border border-cream/12 rounded-3xl max-w-3xl w-full my-8 p-6 sm:p-8"
+        className="relative bg-card border border-cream/12 rounded-3xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-cream/60 hover:text-cream hover:bg-cream/10 transition text-xl"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-cream/60 hover:text-cream hover:bg-cream/10 transition text-xl z-10"
         >
           ×
         </button>
-        <p className="font-script text-3xl text-pink leading-none mb-1">meet the cast</p>
-        <h2 className="font-display text-2xl sm:text-3xl tracking-wide mb-6">THE PAIRINGS</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {DWTS_CAST.map((person) => (
-            <div key={person.name} className="flex flex-col items-center text-center gap-2.5">
-              <img
-                src={person.photo}
-                alt={person.name}
-                className="w-full aspect-square object-cover rounded-2xl border border-cream/10"
-              />
-              <p className="text-sm font-semibold text-cream/85">{captionFor(person.name)}</p>
-            </div>
-          ))}
+        <div className="flex-none px-6 sm:px-8 pt-6 sm:pt-8 pb-1">
+          <p className="font-script text-3xl text-pink leading-none mb-1">meet the cast</p>
+          <h2 className="font-display text-2xl sm:text-3xl tracking-wide">THE PAIRINGS</h2>
+        </div>
+        <div className="overflow-y-auto px-6 sm:px-8 pt-4 pb-6 sm:pb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {DWTS_CAST.map((person) => (
+              <div key={person.name} className="flex flex-col items-center text-center gap-2.5">
+                <img
+                  src={person.photo}
+                  alt={person.name}
+                  className="w-full aspect-square object-cover rounded-2xl border border-cream/10"
+                />
+                <p className="text-sm font-semibold text-cream/85">{captionFor(person.name)}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>,
