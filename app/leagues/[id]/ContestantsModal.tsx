@@ -59,10 +59,25 @@ export function ContestantsModal({
 
   if (!mounted) return null;
 
-  // Prefer the actual contestant entry (which may read "Name with Pro
-  // Partner") if it matches this cast member; otherwise just their name.
+  // Pair each cast photo with (at most) one contestant string, once, so
+  // every lookup below agrees with every other one. Built greedily in
+  // DWTS_CAST order and each contestant is claimed by only the first photo
+  // that matches it — without that exclusivity, two photos whose names
+  // both happen to substring-match the same contestant string could steal
+  // each other's pick and leave one selection with no badge at all.
+  const castToContestant = new Map<string, string>();
+  const claimedContestants = new Set<string>();
+  for (const person of DWTS_CAST) {
+    const found = contestants.find(
+      (c) => !claimedContestants.has(c) && c.toLowerCase().includes(person.name.toLowerCase())
+    );
+    if (found) {
+      castToContestant.set(person.name, found);
+      claimedContestants.add(found);
+    }
+  }
   function matchFor(name: string) {
-    return contestants.find((c) => c.toLowerCase().includes(name.toLowerCase())) ?? null;
+    return castToContestant.get(name) ?? null;
   }
 
   function toggle(contestant: string) {
@@ -124,14 +139,6 @@ export function ContestantsModal({
           {isPicked && (
             <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-pink text-ink font-display text-sm flex items-center justify-center shadow">
               {rank + 1}
-            </span>
-          )}
-          {!isPicked && !isOut && filledSlots < 3 && (
-            <span className="absolute top-2 left-2 w-7 h-7 rounded-full border-2 border-cream/80 bg-ink/25" />
-          )}
-          {!isPicked && !isOut && filledSlots >= 3 && (
-            <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-cream/85 text-ink font-bold text-sm flex items-center justify-center shadow">
-              ×
             </span>
           )}
           {isOut && (
