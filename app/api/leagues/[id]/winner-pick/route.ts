@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isSeasonPredictionsLocked } from "@/lib/leagues";
 
 // One-time season-winner pick for WEEKLY_TOP3 leagues. Once set, it's
 // locked — the API refuses to change it, matching "they only pick their
@@ -8,6 +9,10 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  if (isSeasonPredictionsLocked()) {
+    return NextResponse.json({ error: "Season predictions are closed" }, { status: 400 });
+  }
 
   const body = await request.json();
   const contestant = typeof body.contestant === "string" ? body.contestant.trim() : "";

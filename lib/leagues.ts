@@ -40,3 +40,13 @@ export function formatDueDate(dueDay: string, dueTime: string) {
 export function formatMoney(cents: number) {
   return `$${cents.toLocaleString()}`;
 }
+
+// One-time cutoff for DWTS's pre-season predictions (season winner + final
+// four): 5:00 PM Pacific on Sept 15, 2026. Pacific is on daylight time
+// (UTC-7) that week, hence the 00:00 UTC-next-day timestamp. Not a
+// recurring due date, so it's just hardcoded here rather than modeled.
+export const SEASON_PREDICTIONS_LOCK_AT = "2026-09-16T00:00:00.000Z";
+
+export function isSeasonPredictionsLocked() {
+  return Date.now() >= new Date(SEASON_PREDICTIONS_LOCK_AT).getTime();
+}

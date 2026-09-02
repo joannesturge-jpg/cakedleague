@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isSeasonPredictionsLocked } from "@/lib/leagues";
 
 // One-time "final four" prediction for WEEKLY_TOP3 leagues — 4 contestants
 // picked before week one, +5 points each if they're right. Locked once set,
@@ -8,6 +9,10 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  if (isSeasonPredictionsLocked()) {
+    return NextResponse.json({ error: "Season predictions are closed" }, { status: 400 });
+  }
 
   const body = await request.json();
   const picks: string[] = Array.isArray(body.picks)

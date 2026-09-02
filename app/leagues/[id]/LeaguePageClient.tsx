@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { DRAFT_MODE_LABELS, formatDueDate } from "@/lib/leagues";
+import { DRAFT_MODE_LABELS, formatDueDate, isSeasonPredictionsLocked } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
@@ -50,6 +50,13 @@ type League = {
 };
 
 const MEMBER_COLORS = ["#7B2CF5", "#E85BAE", "#C8A6FF", "#FBF7F4", "#8f47ff"];
+
+// Contestant strings are entered as "Celeb Name & Pro Name" (or "... with
+// Pro ..."). The Submissions tab only wants the celeb's name.
+function celebrityName(full: string) {
+  const idx = full.search(/\s*&\s*|\s+with\s+/i);
+  return idx === -1 ? full : full.slice(0, idx).trim();
+}
 
 export function LeaguePageClient({
   league,
@@ -598,6 +605,8 @@ function WeeklyPicksForm({
 
   return (
     <div className="flex flex-col gap-3">
+      {!isSeasonPredictionsLocked() && (
+        <>
       <div className="bg-card border border-cream/10 rounded-3xl p-6">
         <h3 className="font-display text-xl tracking-wide mb-1.5">SEASON WINNER</h3>
         {winnerPick ? (
@@ -676,6 +685,8 @@ function WeeklyPicksForm({
           </>
         )}
       </div>
+        </>
+      )}
 
       <div className="bg-card border border-cream/10 rounded-3xl p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
@@ -781,34 +792,33 @@ function SubmissionsTab({
         </div>
       </div>
 
-      <div className="bg-card border border-cream/10 rounded-3xl p-6 mb-5">
-        <h3 className="font-display text-xl tracking-wide mb-1.5">SEASON PREDICTIONS</h3>
+      <div className="bg-card border border-cream/10 rounded-2xl p-4 mb-5">
+        <h3 className="font-display text-base tracking-wide mb-1.5">SEASON PREDICTIONS</h3>
         {!seasonPredictionsUnlocked ? (
           <p className="text-sm text-cream/55">
             Lock in your season winner and final four picks on the Details tab to see everyone else&apos;s.
           </p>
         ) : (
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-1.5">
             {members.map((m) => {
               const isMe = m.id === myMembershipId;
               return (
                 <div
                   key={m.id}
-                  className={`p-4 rounded-2xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-ink/40"}`}
+                  className={`px-3.5 py-2 rounded-xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-ink/40"}`}
                 >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="font-display text-base tracking-wide">{m.user.name}</span>
-                    {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">{m.user.name}</span>
+                    {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
                   </div>
                   {m.winnerPick && m.finalFourPicks.length === 4 ? (
-                    <>
-                      <p className="text-sm text-cream/78 mb-1">
-                        Winner: <span className="font-semibold">{m.winnerPick}</span>
-                      </p>
-                      <p className="text-sm text-cream/78">Final four: {m.finalFourPicks.join(", ")}</p>
-                    </>
+                    <p className="text-xs text-cream/68 leading-snug">
+                      Winner: {celebrityName(m.winnerPick)}
+                      <br />
+                      Top 4: {m.finalFourPicks.map(celebrityName).join(", ")}
+                    </p>
                   ) : (
-                    <p className="text-sm text-cream/40">Not submitted yet.</p>
+                    <p className="text-xs text-cream/40">Not submitted yet.</p>
                   )}
                 </div>
               );
