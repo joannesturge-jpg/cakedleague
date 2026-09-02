@@ -26,18 +26,27 @@ const DWTS_CAST = [
 export function ContestantsModal({
   contestants,
   eliminatedContestants,
-  selected,
-  onToggle,
+  initialSelected,
+  onSave,
   onClose,
 }: {
   contestants: string[];
   eliminatedContestants: string[];
-  selected: string[];
-  onToggle: (contestant: string) => void;
+  initialSelected: string[];
+  onSave: (selected: string[]) => void;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // A working copy — closing via the X or the backdrop discards it, only
+  // the Save button pushes it back up.
+  const [draft, setDraft] = useState<string[]>(() => {
+    const seeded = [...initialSelected];
+    while (seeded.length < 3) seeded.push("");
+    return seeded.slice(0, 3);
+  });
+
   if (!mounted) return null;
 
   // Prefer the actual contestant entry (which may read "Name with Pro
@@ -46,7 +55,22 @@ export function ContestantsModal({
     return contestants.find((c) => c.toLowerCase().includes(name.toLowerCase())) ?? null;
   }
 
-  const filledSlots = selected.filter(Boolean).length;
+  function toggle(contestant: string) {
+    setDraft((prev) => {
+      if (prev.includes(contestant)) {
+        const remaining = prev.filter((c) => c !== contestant);
+        while (remaining.length < 3) remaining.push("");
+        return remaining;
+      }
+      const emptyIndex = prev.findIndex((c) => !c);
+      if (emptyIndex === -1) return prev;
+      const next = [...prev];
+      next[emptyIndex] = contestant;
+      return next;
+    });
+  }
+
+  const filledSlots = draft.filter(Boolean).length;
 
   return createPortal(
     <div
@@ -59,7 +83,7 @@ export function ContestantsModal({
       >
         <button
           onClick={onClose}
-          aria-label="Close"
+          aria-label="Close without saving"
           className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-cream/60 hover:text-cream hover:bg-cream/10 transition text-xl z-10"
         >
           ×
@@ -71,20 +95,20 @@ export function ContestantsModal({
             Tap a photo to rank your top three — {filledSlots}/3 picked.
           </p>
         </div>
-        <div className="overflow-y-auto px-6 sm:px-8 pt-4 pb-6 sm:pb-8">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 pt-4 pb-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {DWTS_CAST.map((person) => {
               const match = matchFor(person.name);
               const isOut = match ? eliminatedContestants.includes(match) : false;
               const pickable = !!match && !isOut;
-              const rank = match ? selected.indexOf(match) : -1;
+              const rank = match ? draft.indexOf(match) : -1;
               const isPicked = rank !== -1;
 
               return (
                 <button
                   key={person.name}
                   type="button"
-                  onClick={() => pickable && match && onToggle(match)}
+                  onClick={() => pickable && match && toggle(match)}
                   disabled={!pickable}
                   className={`relative flex flex-col items-center text-center gap-2.5 rounded-2xl p-1.5 transition ${
                     pickable ? "cursor-pointer hover:bg-cream/5" : "cursor-not-allowed opacity-40"
@@ -122,6 +146,15 @@ export function ContestantsModal({
               );
             })}
           </div>
+        </div>
+        <div className="flex-none flex items-center justify-between gap-3 px-6 sm:px-8 py-4 border-t border-cream/10">
+          <p className="text-xs text-cream/45">Closing with × won&apos;t save changes.</p>
+          <button
+            onClick={() => onSave(draft)}
+            className="px-6 py-2.5 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition"
+          >
+            Save picks
+          </button>
         </div>
       </div>
     </div>,

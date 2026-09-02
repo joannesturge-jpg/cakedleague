@@ -541,19 +541,11 @@ function WeeklyPicksForm({
     setDraftSong(p?.songPrediction ?? "");
   }
 
-  function toggleTopThree(contestant: string) {
-    setDraftTop((prev) => {
-      if (prev.includes(contestant)) {
-        const remaining = prev.filter((c) => c !== contestant);
-        while (remaining.length < 3) remaining.push("");
-        return remaining as [string, string, string];
-      }
-      const emptyIndex = prev.findIndex((c) => !c);
-      if (emptyIndex === -1) return prev;
-      const next = [...prev] as [string, string, string];
-      next[emptyIndex] = contestant;
-      return next;
-    });
+  function saveTopThreeFromModal(picked: string[]) {
+    const padded = [...picked];
+    while (padded.length < 3) padded.push("");
+    setDraftTop(padded.slice(0, 3) as [string, string, string]);
+    setShowContestants(false);
   }
 
   if (!template) return null;
@@ -616,8 +608,8 @@ function WeeklyPicksForm({
           <ContestantsModal
             contestants={template.contestants}
             eliminatedContestants={template.eliminatedContestants}
-            selected={draftTop}
-            onToggle={toggleTopThree}
+            initialSelected={draftTop}
+            onSave={saveTopThreeFromModal}
             onClose={() => setShowContestants(false)}
           />
         )}
