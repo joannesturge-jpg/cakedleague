@@ -28,7 +28,15 @@ const RANK_DERIVED_PATTERN = /top three|song/i;
 
 export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] }) {
   const router = useRouter();
-  const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
+  // DWTS is the live show right now — default to it instead of whatever
+  // happens to be first in the list.
+  const [templateId, setTemplateId] = useState(
+    () =>
+      templates.find((t) => t.tag === "DWTS")?.id ??
+      templates.find((t) => t.pickFormat === "WEEKLY_TOP3")?.id ??
+      templates[0]?.id ??
+      ""
+  );
   const [week, setWeek] = useState(1);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -41,47 +49,42 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
     return !!template?.ruleAwards.some((a) => a.ruleId === ruleId && a.week === week && a.contestant === contestant);
   }
 
-  async function toggleAward(ruleId: string, contestant: string) {
+  // Nothing here saves as you go — WeeklyTop3Scoring and DraftRulesScoring
+  // keep their own local draft of the week's entries, and only call this
+  // (via their "Submit Week N" button) once you're done editing.
+  async function submitWeek(
+    scoreChanges: { contestant: string; score: number }[],
+    awardChanges: { ruleId: string; contestant: string }[]
+  ) {
     if (!template) return;
-    const key = `award:${ruleId}:${contestant}`;
-    setBusyKey(key);
+    setBusyKey("submit");
     setError("");
     try {
-      const res = await fetch(`/api/admin/templates/${template.id}/scoring`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ week, ruleId, contestant }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || "Couldn't save that");
+      for (const s of scoreChanges) {
+        const res = await fetch(`/api/admin/templates/${template.id}/weekly-score`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ week, contestant: s.contestant, score: s.score }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || `Couldn't save ${s.contestant}'s score`);
+        }
+      }
+      for (const a of awardChanges) {
+        const res = await fetch(`/api/admin/templates/${template.id}/scoring`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ week, ruleId: a.ruleId, contestant: a.contestant }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || "Couldn't save a rule");
+        }
       }
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save that");
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
-  async function saveScore(contestant: string, score: number) {
-    if (!template) return;
-    const key = `score:${contestant}`;
-    setBusyKey(key);
-    setError("");
-    try {
-      const res = await fetch(`/api/admin/templates/${template.id}/weekly-score`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ week, contestant, score }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || "Couldn't save that score");
-      }
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save that score");
+      setError(err instanceof Error ? err.message : "Couldn't save this week's scoring");
     } finally {
       setBusyKey(null);
     }
@@ -193,19 +196,19 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
           week={week}
           activeContestants={activeContestants}
           busyKey={busyKey}
-          onSaveScore={saveScore}
-          onToggleAward={toggleAward}
           isAwarded={isAwarded}
           onToggleEliminated={toggleEliminated}
           onSaveActualResults={saveActualResults}
+          onSubmitWeek={submitWeek}
         />
       ) : (
-        <RulesScoring
-          rules={template.rules}
+        <DraftRulesScoring
+          template={template}
+          week={week}
           activeContestants={activeContestants}
           busyKey={busyKey}
           isAwarded={isAwarded}
-          onToggleAward={toggleAward}
+          onSubmitWeek={(awardChanges) => submitWeek([], awardChanges)}
         />
       )}
     </div>
@@ -275,30 +278,82 @@ function WeeklyTop3Scoring({
   week,
   activeContestants,
   busyKey,
-  onSaveScore,
-  onToggleAward,
   isAwarded,
   onToggleEliminated,
   onSaveActualResults,
+  onSubmitWeek,
 }: {
   template: AdminScoringTemplate;
   week: number;
   activeContestants: string[];
   busyKey: string | null;
-  onSaveScore: (contestant: string, score: number) => void;
-  onToggleAward: (ruleId: string, contestant: string) => void;
   isAwarded: (ruleId: string, contestant: string) => boolean;
   onToggleEliminated: (contestant: string) => void;
   onSaveActualResults: (payload: { actualFinalFour?: string[]; actualWinner?: string }) => void;
+  onSubmitWeek: (
+    scoreChanges: { contestant: string; score: number }[],
+    awardChanges: { ruleId: string; contestant: string }[]
+  ) => void;
 }) {
   const scoresThisWeek = template.weeklyScores.filter((s) => s.week === week);
   const scoreOf = (c: string) => scoresThisWeek.find((s) => s.contestant === c)?.score ?? 0;
 
-  const ranked = [...activeContestants].sort((a, b) => scoreOf(b) - scoreOf(a));
-  const thirdPlaceScore = ranked.length >= 3 ? scoreOf(ranked[2]) : -Infinity;
-  const topThree = new Set(ranked.filter((c) => scoreOf(c) >= thirdPlaceScore && scoreOf(c) > 0));
-
   const otherRules = template.rules.filter((r) => !RANK_DERIVED_PATTERN.test(r.label));
+
+  // Nothing here saves as it's typed/clicked — it's all held in a local
+  // draft, seeded from the committed data, until "Submit Week N" is
+  // pressed. Re-seeded whenever the selected template or week changes.
+  function seedScores() {
+    return Object.fromEntries(activeContestants.map((c) => [c, String(scoreOf(c))]));
+  }
+  function seedAwards() {
+    const s = new Set<string>();
+    for (const rule of otherRules) {
+      for (const c of activeContestants) {
+        if (isAwarded(rule.id, c)) s.add(`${rule.id}:${c}`);
+      }
+    }
+    return s;
+  }
+  const draftKey = `${template.id}-${week}`;
+  const [draftScores, setDraftScores] = useState<Record<string, string>>(() => seedScores());
+  const [draftAwards, setDraftAwards] = useState<Set<string>>(() => seedAwards());
+  const [syncedKey, setSyncedKey] = useState(draftKey);
+  if (draftKey !== syncedKey) {
+    setSyncedKey(draftKey);
+    setDraftScores(seedScores());
+    setDraftAwards(seedAwards());
+  }
+
+  function draftScoreOf(c: string) {
+    return Math.round(Number(draftScores[c]) || 0);
+  }
+  function draftIsAwarded(ruleId: string, c: string) {
+    return draftAwards.has(`${ruleId}:${c}`);
+  }
+  function toggleDraftAward(ruleId: string, c: string) {
+    setDraftAwards((prev) => {
+      const next = new Set(prev);
+      const key = `${ruleId}:${c}`;
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const ranked = [...activeContestants].sort((a, b) => draftScoreOf(b) - draftScoreOf(a));
+  const thirdPlaceScore = ranked.length >= 3 ? draftScoreOf(ranked[2]) : -Infinity;
+  const topThree = new Set(ranked.filter((c) => draftScoreOf(c) >= thirdPlaceScore && draftScoreOf(c) > 0));
+
+  const scoreChanges = activeContestants
+    .filter((c) => draftScoreOf(c) !== scoreOf(c))
+    .map((c) => ({ contestant: c, score: draftScoreOf(c) }));
+  const awardChanges = otherRules.flatMap((rule) =>
+    activeContestants
+      .filter((c) => draftIsAwarded(rule.id, c) !== isAwarded(rule.id, c))
+      .map((c) => ({ ruleId: rule.id, contestant: c }))
+  );
+  const pendingCount = scoreChanges.length + awardChanges.length;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -326,12 +381,9 @@ function WeeklyTop3Scoring({
                 <span className="flex-1 text-sm truncate">{c}</span>
                 {inTop3 && <span className="text-[10px] font-bold text-[#1E7B45]">TOP 3</span>}
                 <input
-                  key={`${template.id}-${week}-${c}`}
                   type="number"
-                  defaultValue={scoreOf(c)}
-                  disabled={busyKey === `score:${c}`}
-                  onBlur={(e) => onSaveScore(c, Math.round(Number(e.target.value) || 0))}
-                  onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                  value={draftScores[c] ?? "0"}
+                  onChange={(e) => setDraftScores((prev) => ({ ...prev, [c]: e.target.value }))}
                   className="w-16 px-2 py-1 rounded border border-[#D6D9E0] bg-white text-sm text-center outline-none focus:border-purple transition"
                 />
               </div>
@@ -356,10 +408,25 @@ function WeeklyTop3Scoring({
           rules={otherRules}
           activeContestants={activeContestants}
           busyKey={busyKey}
-          isAwarded={isAwarded}
-          onToggleAward={onToggleAward}
+          isAwarded={draftIsAwarded}
+          onToggleAward={toggleDraftAward}
         />
       )}
+
+      <div className="flex items-center justify-between gap-3 px-[18px] py-3.5 bg-white border border-[#E2E4E9] rounded-lg">
+        <span className="text-[13px] text-[#5B6270]">
+          {pendingCount === 0
+            ? "No changes to submit"
+            : `${pendingCount} change${pendingCount === 1 ? "" : "s"} ready to submit`}
+        </span>
+        <button
+          onClick={() => onSubmitWeek(scoreChanges, awardChanges)}
+          disabled={pendingCount === 0 || busyKey === "submit"}
+          className="px-5 py-2.5 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+        >
+          {busyKey === "submit" ? "Submitting…" : `Submit Week ${week}`}
+        </button>
+      </div>
 
       <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
         <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">COUPLE ELIMINATED</div>
@@ -381,6 +448,85 @@ function WeeklyTop3Scoring({
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Same "draft locally, submit once" pattern as WeeklyTop3Scoring's rule
+// toggles, for templates that don't have a score grid — just the rule
+// list.
+function DraftRulesScoring({
+  template,
+  week,
+  activeContestants,
+  busyKey,
+  isAwarded,
+  onSubmitWeek,
+}: {
+  template: AdminScoringTemplate;
+  week: number;
+  activeContestants: string[];
+  busyKey: string | null;
+  isAwarded: (ruleId: string, contestant: string) => boolean;
+  onSubmitWeek: (awardChanges: { ruleId: string; contestant: string }[]) => void;
+}) {
+  function seedAwards() {
+    const s = new Set<string>();
+    for (const rule of template.rules) {
+      for (const c of activeContestants) {
+        if (isAwarded(rule.id, c)) s.add(`${rule.id}:${c}`);
+      }
+    }
+    return s;
+  }
+  const draftKey = `${template.id}-${week}`;
+  const [draftAwards, setDraftAwards] = useState<Set<string>>(() => seedAwards());
+  const [syncedKey, setSyncedKey] = useState(draftKey);
+  if (draftKey !== syncedKey) {
+    setSyncedKey(draftKey);
+    setDraftAwards(seedAwards());
+  }
+
+  function draftIsAwarded(ruleId: string, c: string) {
+    return draftAwards.has(`${ruleId}:${c}`);
+  }
+  function toggle(ruleId: string, c: string) {
+    setDraftAwards((prev) => {
+      const next = new Set(prev);
+      const key = `${ruleId}:${c}`;
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const changes = template.rules.flatMap((rule) =>
+    activeContestants
+      .filter((c) => draftIsAwarded(rule.id, c) !== isAwarded(rule.id, c))
+      .map((c) => ({ ruleId: rule.id, contestant: c }))
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <RulesScoring
+        rules={template.rules}
+        activeContestants={activeContestants}
+        busyKey={busyKey}
+        isAwarded={draftIsAwarded}
+        onToggleAward={toggle}
+      />
+      <div className="flex items-center justify-between gap-3 px-[18px] py-3.5 bg-white border border-[#E2E4E9] rounded-lg">
+        <span className="text-[13px] text-[#5B6270]">
+          {changes.length === 0 ? "No changes to submit" : `${changes.length} change${changes.length === 1 ? "" : "s"} ready to submit`}
+        </span>
+        <button
+          onClick={() => onSubmitWeek(changes)}
+          disabled={changes.length === 0 || busyKey === "submit"}
+          className="px-5 py-2.5 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+        >
+          {busyKey === "submit" ? "Submitting…" : `Submit Week ${week}`}
+        </button>
       </div>
     </div>
   );
