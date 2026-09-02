@@ -59,7 +59,7 @@ export function LeaguePageClient({
   currentUserId: string;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"details" | "rankings" | "scoring">("details");
+  const [tab, setTab] = useState<"details" | "submissions" | "rankings" | "scoring">("details");
   const [rulesOpen, setRulesOpen] = useState(true);
   const [membersOpen, setMembersOpen] = useState(true);
   const [copyLabel, setCopyLabel] = useState("Copy link");
@@ -239,6 +239,11 @@ export function LeaguePageClient({
         <TabButton active={tab === "details"} onClick={() => setTab("details")}>
           Details
         </TabButton>
+        {league.template?.pickFormat === "WEEKLY_TOP3" && (
+          <TabButton active={tab === "submissions"} onClick={() => setTab("submissions")}>
+            Submissions
+          </TabButton>
+        )}
         <TabButton active={tab === "rankings"} onClick={() => setTab("rankings")}>
           Rankings
         </TabButton>
@@ -360,6 +365,10 @@ export function LeaguePageClient({
             )}
           </div>
         </div>
+      )}
+
+      {tab === "submissions" && (
+        <SubmissionsTab members={league.members} weeks={league.weeks ?? 11} myMembershipId={myMembership?.id ?? null} />
       )}
 
       {tab === "rankings" && <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />}
@@ -622,6 +631,86 @@ function WeeklyPicksForm({
           {weekliesBusy ? "Saving…" : existing ? "Update picks" : "Save picks"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function SubmissionsTab({
+  members,
+  weeks,
+  myMembershipId,
+}: {
+  members: Member[];
+  weeks: number;
+  myMembershipId: string | null;
+}) {
+  const [week, setWeek] = useState(1);
+  const myPick = members.find((m) => m.id === myMembershipId)?.weeklyPicks.find((p) => p.week === week);
+  const unlocked = !!myPick;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+        <div>
+          <p className="font-script text-3xl text-pink leading-none mb-0.5">the tea</p>
+          <h1 className="font-display text-3xl tracking-wide">SUBMISSIONS</h1>
+        </div>
+        <select
+          value={week}
+          onChange={(e) => setWeek(Number(e.target.value))}
+          className="px-3.5 py-2.5 rounded-xl bg-card border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+        >
+          {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
+            <option key={w} value={w}>
+              Week {w}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!unlocked ? (
+        <div className="bg-card border border-cream/10 rounded-3xl p-8 text-center">
+          <p className="font-script text-3xl text-pink leading-none">not yet</p>
+          <h3 className="font-display text-xl tracking-wide mt-2 mb-1.5">SUBMIT YOUR PICKS FIRST</h3>
+          <p className="text-sm text-cream/55">
+            Submit your Week {week} picks on the Details tab to see everyone else&apos;s.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {members.map((m) => {
+            const pick = m.weeklyPicks.find((p) => p.week === week);
+            const isMe = m.id === myMembershipId;
+            return (
+              <div
+                key={m.id}
+                className={`p-5 rounded-2xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-card"}`}
+              >
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="font-display text-lg tracking-wide">{m.user.name}</span>
+                  {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
+                </div>
+                {pick ? (
+                  <>
+                    <ol className="flex flex-col gap-1 mb-2">
+                      {pick.topThree.map((c, i) => (
+                        <li key={i} className="text-sm text-cream/78">
+                          {i + 1}. {c}
+                        </li>
+                      ))}
+                    </ol>
+                    {pick.songPrediction && (
+                      <p className="text-xs text-cream/50">Song: {pick.songPrediction}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-cream/40">Not submitted yet.</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
