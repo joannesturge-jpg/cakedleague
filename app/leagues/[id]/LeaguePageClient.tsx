@@ -541,6 +541,21 @@ function WeeklyPicksForm({
     setDraftSong(p?.songPrediction ?? "");
   }
 
+  function toggleTopThree(contestant: string) {
+    setDraftTop((prev) => {
+      if (prev.includes(contestant)) {
+        const remaining = prev.filter((c) => c !== contestant);
+        while (remaining.length < 3) remaining.push("");
+        return remaining as [string, string, string];
+      }
+      const emptyIndex = prev.findIndex((c) => !c);
+      if (emptyIndex === -1) return prev;
+      const next = [...prev] as [string, string, string];
+      next[emptyIndex] = contestant;
+      return next;
+    });
+  }
+
   if (!template) return null;
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
   const existing = weeklyPicks.find((p) => p.week === selectedWeek);
@@ -598,7 +613,13 @@ function WeeklyPicksForm({
           </div>
         </div>
         {showContestants && (
-          <ContestantsModal contestants={template.contestants} onClose={() => setShowContestants(false)} />
+          <ContestantsModal
+            contestants={template.contestants}
+            eliminatedContestants={template.eliminatedContestants}
+            selected={draftTop}
+            onToggle={toggleTopThree}
+            onClose={() => setShowContestants(false)}
+          />
         )}
         <p className="text-sm text-cream/55 mb-4">Rank your top three for this week, in order.</p>
         {weeklyError && <p className="text-sm text-pink font-medium mb-3">{weeklyError}</p>}

@@ -23,16 +23,30 @@ const DWTS_CAST = [
   { name: "Julia Stiles", photo: "/dwts-cast/julia-stiles.avif" },
 ];
 
-export function ContestantsModal({ contestants, onClose }: { contestants: string[]; onClose: () => void }) {
+export function ContestantsModal({
+  contestants,
+  eliminatedContestants,
+  selected,
+  onToggle,
+  onClose,
+}: {
+  contestants: string[];
+  eliminatedContestants: string[];
+  selected: string[];
+  onToggle: (contestant: string) => void;
+  onClose: () => void;
+}) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
   // Prefer the actual contestant entry (which may read "Name with Pro
   // Partner") if it matches this cast member; otherwise just their name.
-  function captionFor(name: string) {
-    return contestants.find((c) => c.toLowerCase().includes(name.toLowerCase())) ?? name;
+  function matchFor(name: string) {
+    return contestants.find((c) => c.toLowerCase().includes(name.toLowerCase())) ?? null;
   }
+
+  const filledSlots = selected.filter(Boolean).length;
 
   return createPortal(
     <div
@@ -53,19 +67,52 @@ export function ContestantsModal({ contestants, onClose }: { contestants: string
         <div className="flex-none px-6 sm:px-8 pt-6 sm:pt-8 pb-1">
           <p className="font-script text-3xl text-pink leading-none mb-1">meet the cast</p>
           <h2 className="font-display text-2xl sm:text-3xl tracking-wide">THE PAIRINGS</h2>
+          <p className="text-sm text-cream/55 mt-1.5">
+            Tap a photo to rank your top three — {filledSlots}/3 picked.
+          </p>
         </div>
         <div className="overflow-y-auto px-6 sm:px-8 pt-4 pb-6 sm:pb-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {DWTS_CAST.map((person) => (
-              <div key={person.name} className="flex flex-col items-center text-center gap-2.5">
-                <img
-                  src={person.photo}
-                  alt={person.name}
-                  className="w-full aspect-square object-cover rounded-2xl border border-cream/10"
-                />
-                <p className="text-sm font-semibold text-cream/85">{captionFor(person.name)}</p>
-              </div>
-            ))}
+            {DWTS_CAST.map((person) => {
+              const match = matchFor(person.name);
+              const isOut = match ? eliminatedContestants.includes(match) : false;
+              const pickable = !!match && !isOut;
+              const rank = match ? selected.indexOf(match) : -1;
+              const isPicked = rank !== -1;
+
+              return (
+                <button
+                  key={person.name}
+                  type="button"
+                  onClick={() => pickable && match && onToggle(match)}
+                  disabled={!pickable}
+                  className={`relative flex flex-col items-center text-center gap-2.5 rounded-2xl p-1.5 transition ${
+                    pickable ? "cursor-pointer hover:bg-cream/5" : "cursor-not-allowed opacity-40"
+                  }`}
+                >
+                  <div className="relative w-full">
+                    <img
+                      src={person.photo}
+                      alt={person.name}
+                      className={`w-full aspect-square object-cover rounded-2xl border-2 transition ${
+                        isPicked ? "border-pink" : "border-cream/10"
+                      }`}
+                    />
+                    {isPicked && (
+                      <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-pink text-ink font-display text-sm flex items-center justify-center shadow">
+                        {rank + 1}
+                      </span>
+                    )}
+                    {isOut && (
+                      <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-ink/70">
+                        <span className="text-[10px] font-bold tracking-widest text-cream/70">ELIMINATED</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold text-cream/85">{match ?? person.name}</p>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
