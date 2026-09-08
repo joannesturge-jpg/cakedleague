@@ -37,6 +37,45 @@ export function formatDueDate(dueDay: string, dueTime: string) {
   return `${day}s at ${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+const WEEKDAY_INDEX: Record<string, number> = {
+  SUNDAY: 0,
+  MONDAY: 1,
+  TUESDAY: 2,
+  WEDNESDAY: 3,
+  THURSDAY: 4,
+  FRIDAY: 5,
+  SATURDAY: 6,
+};
+
+// The next real calendar date picks are due — always strictly in the
+// future. If today happens to be the due day, this rolls to next week
+// rather than "today": once that day arrives, the deadline that's
+// actually still ahead of a member is next week's, not the one for a
+// show that's already airing tonight.
+export function nextDueDate(dueDay: string, from: Date = new Date()) {
+  const targetDay = WEEKDAY_INDEX[dueDay];
+  if (targetDay === undefined) return null;
+  let diff = (targetDay - from.getDay() + 7) % 7;
+  if (diff === 0) diff = 7;
+  const result = new Date(from);
+  result.setDate(from.getDate() + diff);
+  return result;
+}
+
+// Like formatDueDate, but as a concrete upcoming date ("Tuesday, Sep 15 at
+// 8:00 PM") instead of a generic recurring label — so the one day a week
+// this actually matches "today" doesn't read as "due right now."
+export function formatNextDueDate(dueDay: string, dueTime: string, from: Date = new Date()) {
+  const date = nextDueDate(dueDay, from);
+  if (!date) return formatDueDate(dueDay, dueTime);
+  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
+  const month = date.toLocaleDateString("en-US", { month: "short" });
+  const [h, m] = dueTime.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${weekday}, ${month} ${date.getDate()} at ${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 export function formatMoney(cents: number) {
   return `$${cents.toLocaleString()}`;
 }

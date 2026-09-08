@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { DRAFT_MODE_LABELS, formatDueDate, isSeasonPredictionsLocked } from "@/lib/leagues";
+import { DRAFT_MODE_LABELS, formatDueDate, formatNextDueDate, isSeasonPredictionsLocked } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
@@ -305,7 +305,7 @@ export function LeaguePageClient({
 
           <div className="flex items-center justify-between gap-4 flex-wrap p-5 rounded-2xl bg-pink/10 border border-pink/35 mb-3">
             <div className="text-[10.5px] tracking-widest text-pink font-bold">PICKS DUE</div>
-            <div className="font-display text-xl tracking-wide">{formatDueDate(league.dueDay, league.dueTime)}</div>
+            <div className="font-display text-xl tracking-wide">{formatNextDueDate(league.dueDay, league.dueTime)}</div>
           </div>
 
           <button

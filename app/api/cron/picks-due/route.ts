@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPicksDueReminderEmail } from "@/lib/email";
-import { formatDueDate } from "@/lib/leagues";
+import { formatNextDueDate } from "@/lib/leagues";
 
 // Runs once daily (see vercel.json) around 9am ET — Vercel's free plan only
 // allows a cron to run once a day, so this can't hit the exact hour of
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     }
 
     const recipients = league.members.filter((m) => m.user.notifyPicksDue);
-    const dueLabel = formatDueDate(league.dueDay, league.dueTime);
+    const dueLabel = formatNextDueDate(league.dueDay, league.dueTime);
 
     await Promise.all(
       recipients.map((m) => sendPicksDueReminderEmail(m.user.email, m.user.id, league.name, dueLabel, league.id))

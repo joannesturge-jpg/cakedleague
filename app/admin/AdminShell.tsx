@@ -6,6 +6,7 @@ import { AdminTemplates, type AdminTemplateRow } from "./AdminTemplates";
 import { AdminMarketing, type NotifySignupRow } from "./AdminMarketing";
 import { AdminLeagues, type AdminLeagueRow } from "./AdminLeagues";
 import { AdminScoring } from "./AdminScoring";
+import { AdminAnalytics, type AdminAnalyticsData } from "./AdminAnalytics";
 
 export function AdminShell({
   adminEmail,
@@ -14,6 +15,7 @@ export function AdminShell({
   notifySignups,
   publicLeagueByTemplate,
   leagues,
+  analytics,
 }: {
   adminEmail: string;
   users: AdminUserRow[];
@@ -21,8 +23,9 @@ export function AdminShell({
   notifySignups: NotifySignupRow[];
   publicLeagueByTemplate: Record<string, string>;
   leagues: AdminLeagueRow[];
+  analytics: AdminAnalyticsData;
 }) {
-  const [tab, setTab] = useState<"users" | "templates" | "scoring" | "leagues" | "marketing">("users");
+  const [tab, setTab] = useState<"users" | "templates" | "scoring" | "leagues" | "marketing" | "analytics">("users");
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-[#16181D] font-sans">
@@ -53,6 +56,9 @@ export function AdminShell({
         <TabButton active={tab === "marketing"} onClick={() => setTab("marketing")}>
           Marketing
         </TabButton>
+        <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")}>
+          Analytics
+        </TabButton>
       </div>
 
       <div className="px-4 sm:px-8 py-6 pb-16">
@@ -63,6 +69,7 @@ export function AdminShell({
         {tab === "scoring" && <AdminScoring templates={templates} />}
         {tab === "leagues" && <AdminLeagues leagues={leagues} />}
         {tab === "marketing" && <AdminMarketing signups={notifySignups} />}
+        {tab === "analytics" && <AdminAnalytics data={analytics} />}
       </div>
     </div>
   );
