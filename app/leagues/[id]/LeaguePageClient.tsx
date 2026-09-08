@@ -75,7 +75,7 @@ export function LeaguePageClient({
   const [deleting, setDeleting] = useState(false);
 
   const myMembership = league.members.find((m) => m.userId === currentUserId);
-  const [notifyOn, setNotifyOn] = useState(myMembership?.notifyPicksDue ?? true);
+  const [notifyOn, setNotifyOn] = useState(myMembership?.notifyPicksDue ?? false);
   const [notifySaving, setNotifySaving] = useState(false);
 
   const [picks, setPicks] = useState(league.picks);

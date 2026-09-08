@@ -186,7 +186,10 @@ model LeagueMember {
   id             String   @id @default(cuid())
   role           String   @default("MEMBER")
   joinedAt       DateTime @default(now())
-  notifyPicksDue Boolean  @default(true)
+  // Off by default for new memberships (league creation, join) — existing
+  // members keep whatever they already had, since a schema default only
+  // applies to rows created after this changed.
+  notifyPicksDue Boolean  @default(false)
   // WEEKLY_TOP3 leagues (DWTS): the season-winner pick, made once and then
   // locked — the API refuses to change it once set.
   winnerPick     String?
