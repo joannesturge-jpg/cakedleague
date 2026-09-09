@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken, hashPassword, isAdminEmail, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth";
 import { sendSignupConfirmationEmail } from "@/lib/email";
@@ -18,13 +17,6 @@ export async function POST(request: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-
-  // The staging site is admin-only end to end — don't let anyone but an
-  // admin email even create an account there.
-  const host = headers().get("host") || "";
-  if (host.startsWith("test.") && !isAdminEmail(normalizedEmail)) {
-    return NextResponse.json({ error: "Signups are restricted on this environment" }, { status: 403 });
-  }
 
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) {

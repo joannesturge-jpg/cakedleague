@@ -11,14 +11,9 @@ export const metadata: Metadata = {
   description: "Draft anything. Even the weird stuff.",
 };
 
-// Routes an admin needs to reach before they're logged in — everything
-// else on test.cakedleagues.com is blocked until they are.
-const PUBLIC_ON_TEST_HOST = ["/login", "/signup", "/forgot-password", "/reset-password"];
-
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const host = headers().get("host") || "";
   const isAdminHost = host.startsWith("admin.");
-  const isTestHost = host.startsWith("test.");
 
   if (isAdminHost) {
     // The admin panel (app/admin/AdminDashboard.tsx) is its own fully
@@ -33,47 +28,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const user = await getCurrentUser();
 
-  if (isTestHost) {
-    const pathname = headers().get("x-pathname") || "";
-    const isPublicRoute = PUBLIC_ON_TEST_HOST.some((p) => pathname.startsWith(p));
-    if (!isPublicRoute && !user?.isAdmin) {
-      return (
-        <html lang="en">
-          <body className="bg-ink text-cream font-sans flex items-center justify-center min-h-screen px-6 text-center">
-            <div>
-              <h1 className="font-display text-3xl tracking-wide mb-3">STAGING — ADMIN ONLY</h1>
-              <p className="text-cream/60 mb-6 max-w-sm">
-                This is a testing environment for upcoming features. Log in with an admin account to continue.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <Link
-                  href="/login"
-                  className="px-5 py-2.5 rounded-full border border-cream/20 text-sm font-semibold hover:border-cream transition"
-                >
-                  Log in
-                </Link>
-                <Link
-                  href="/signup"
-                  className="px-5 py-2.5 rounded-full bg-pink text-ink text-sm font-bold hover:bg-cream transition"
-                >
-                  Sign up
-                </Link>
-              </div>
-            </div>
-          </body>
-        </html>
-      );
-    }
-  }
-
   return (
     <html lang="en">
       <body className="bg-ink text-cream font-sans">
-        {isTestHost && (
-          <div className="px-4 py-1.5 text-center text-[11px] font-bold tracking-widest bg-pink text-ink">
-            TESTING ENVIRONMENT — not visible to real users
-          </div>
-        )}
         <header className="sticky top-0 z-50 flex items-center justify-between gap-3 flex-wrap px-5 sm:px-7 py-3 bg-ink/90 backdrop-blur-md border-b border-cream/10">
           <Link href="/" className="flex items-baseline gap-2 flex-none">
             <span className="font-display text-2xl tracking-wide">CAKED</span>
