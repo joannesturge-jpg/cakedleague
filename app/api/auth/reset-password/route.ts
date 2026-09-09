@@ -2,8 +2,13 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  if (!rateLimit(`reset:ip:${clientIp(request)}`, 20, 60 * 60 * 1000)) {
+    return tooManyRequests();
+  }
+
   const { token, password } = await request.json();
 
   if (typeof token !== "string" || token.length === 0) {
@@ -23,7 +28,10 @@ export async function POST(request: Request) {
   await prisma.$transaction([
     prisma.user.update({
       where: { id: resetToken.userId },
-      data: { passwordHash: await hashPassword(password) },
+      // Bumping tokenVersion signs every other active session out — if the
+      // reset was needed because the password leaked, any session an
+      // attacker already had stops working the moment this runs.
+      data: { passwordHash: await hashPassword(password), tokenVersion: { increment: 1 } },
     }),
     prisma.passwordResetToken.update({
       where: { id: resetToken.id },

@@ -16,6 +16,9 @@ model User {
   isAdmin      Boolean   @default(false)
   isBlocked    Boolean   @default(false)
   createdAt    DateTime  @default(now())
+  // Bumped on every password reset so old session cookies stop working
+  // immediately instead of staying valid until they naturally expire.
+  tokenVersion Int       @default(0)
 
   notifyPicksDue Boolean @default(true)
   notifyScoring  Boolean @default(true)

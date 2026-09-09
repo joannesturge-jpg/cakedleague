@@ -20,18 +20,21 @@ export function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSessionToken(userId: string) {
-  return new SignJWT({ sub: userId })
+export async function createSessionToken(userId: string, tokenVersion: number) {
+  return new SignJWT({ sub: userId, tv: tokenVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
     .sign(secretKey());
 }
 
-export async function verifySessionToken(token: string): Promise<string | null> {
+export async function verifySessionToken(
+  token: string
+): Promise<{ userId: string; tokenVersion: number } | null> {
   try {
     const { payload } = await jwtVerify(token, secretKey());
-    return typeof payload.sub === "string" ? payload.sub : null;
+    if (typeof payload.sub !== "string" || typeof payload.tv !== "number") return null;
+    return { userId: payload.sub, tokenVersion: payload.tv };
   } catch {
     return null;
   }
@@ -71,12 +74,15 @@ export function sessionCookieOptions() {
 export async function getCurrentUser() {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const userId = await verifySessionToken(token);
-  if (!userId) return null;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  // A block takes effect on the next request, not just the next login —
-  // treat a blocked user's existing session as logged out.
-  return user?.isBlocked ? null : user;
+  const session = await verifySessionToken(token);
+  if (!session) return null;
+  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  if (!user || user.isBlocked) return null;
+  // A password reset bumps tokenVersion so any session token issued before
+  // the reset — including one an attacker had — stops working immediately,
+  // instead of staying valid for up to 30 days.
+  if (user.tokenVersion !== session.tokenVersion) return null;
+  return user;
 }
 
 export async function getAdminUser() {

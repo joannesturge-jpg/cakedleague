@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken, hashPassword, isAdminEmail, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth";
 import { sendSignupConfirmationEmail } from "@/lib/email";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  if (!rateLimit(`signup:ip:${clientIp(request)}`, 8, 60 * 60 * 1000)) {
+    return tooManyRequests();
+  }
+
   const { email, name, password } = await request.json();
 
   if (typeof email !== "string" || !/^\S+@\S+\.\S+$/.test(email)) {
@@ -34,7 +39,7 @@ export async function POST(request: Request) {
 
   await sendSignupConfirmationEmail(user.email, user.id);
 
-  const token = await createSessionToken(user.id);
+  const token = await createSessionToken(user.id, user.tokenVersion);
   const res = NextResponse.json({ id: user.id, name: user.name, email: user.email });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
   return res;
