@@ -3,10 +3,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DRAFT_MODE_LABELS, formatDueDate, formatNextDueDate, isSeasonPredictionsLocked } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
-import { RosterContestantsModal, findRosterCast } from "./RosterContestantsModal";
+import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type WeeklyPick = { id: string; week: number; topThree: string[]; songPrediction: string | null };
+type CategoryPick = {
+  id: string;
+  week: number;
+  starBakerPick: string | null;
+  technicalPick: string | null;
+  votedOffPick: string | null;
+};
 type Member = {
   id: string;
   userId: string;
@@ -15,6 +22,7 @@ type Member = {
   winnerPick: string | null;
   finalFourPicks: string[];
   weeklyPicks: WeeklyPick[];
+  categoryPicks: CategoryPick[];
   user: { name: string };
 };
 type Pick = { id: string; contestant: string; memberId: string };
@@ -192,6 +200,36 @@ export function LeaguePageClient({
       return false;
     } finally {
       setWeekliesBusy(false);
+    }
+  }
+
+  const [categoryPicks, setCategoryPicks] = useState(myMembership?.categoryPicks ?? []);
+  const [categoryBusy, setCategoryBusy] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+
+  async function submitCategoryPick(week: number, draft: CategoryDraft) {
+    setCategoryBusy(true);
+    setCategoryError("");
+    try {
+      const res = await fetch(`/api/leagues/${league.id}/category-pick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          week,
+          starBakerPick: draft.starBaker || undefined,
+          technicalPick: draft.technical || undefined,
+          votedOffPick: draft.votedOff || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't save that pick");
+      setCategoryPicks((prev) => [...prev.filter((p) => p.week !== week), data]);
+      return true;
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : "Couldn't save that pick");
+      return false;
+    } finally {
+      setCategoryBusy(false);
     }
   }
 
@@ -390,6 +428,15 @@ export function LeaguePageClient({
                 weeklyError={weeklyError}
                 onSubmitWeekly={submitWeeklyPick}
               />
+            ) : league.template?.pickFormat === "WEEKLY_CATEGORIES" ? (
+              <CategoryPicksForm
+                template={league.template}
+                weeks={league.weeks ?? 10}
+                categoryPicks={categoryPicks}
+                categoryBusy={categoryBusy}
+                categoryError={categoryError}
+                onSubmitCategory={submitCategoryPick}
+              />
             ) : (
               <DraftPool
                 template={league.template}
@@ -477,8 +524,6 @@ function DraftPool({
   onDraft: (contestant: string) => void;
   onUndraft: (contestant: string) => void;
 }) {
-  const [showContestants, setShowContestants] = useState(false);
-
   if (!template || template.contestants.length === 0) {
     return (
       <div className="bg-card border border-cream/10 rounded-2xl p-6 text-center">
@@ -491,46 +536,21 @@ function DraftPool({
 
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
   const memberName = (memberId: string) => members.find((m) => m.id === memberId)?.user.name ?? "Someone";
-  const rosterCast = findRosterCast(template.contestants);
 
   return (
     <div className="bg-card border border-cream/10 rounded-3xl p-6">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
         <h3 className="font-display text-xl tracking-wide">DRAFT POOL</h3>
-        <div className="flex items-center gap-3">
-          {template.draftOpenDay && template.draftOpenTime && (
-            <span className="text-[11px] text-cream/40 font-semibold">
-              Picks open {formatDueDate(template.draftOpenDay, template.draftOpenTime)} PT
-            </span>
-          )}
-          {rosterCast && (
-            <button
-              onClick={() => setShowContestants(true)}
-              className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
-            >
-              See Contestants
-            </button>
-          )}
-        </div>
+        {template.draftOpenDay && template.draftOpenTime && (
+          <span className="text-[11px] text-cream/40 font-semibold">
+            Picks open {formatDueDate(template.draftOpenDay, template.draftOpenTime)} PT
+          </span>
+        )}
       </div>
       <p className="text-sm text-cream/55 mb-4">
         First come, first served — once someone drafts a contestant, they&apos;re off the board.
       </p>
       {error && <p className="text-sm text-pink font-medium mb-3">{error}</p>}
-      {rosterCast && showContestants && (
-        <RosterContestantsModal
-          cast={rosterCast.cast}
-          matches={rosterCast.matches}
-          eliminatedContestants={template.eliminatedContestants}
-          picks={picks}
-          members={members}
-          myMembershipId={myMembershipId}
-          busy={busy}
-          onDraft={onDraft}
-          onUndraft={onUndraft}
-          onClose={() => setShowContestants(false)}
-        />
-      )}
       <div className="flex flex-wrap gap-1.5">
         {active.map((c) => {
           const pick = picks.find((p) => p.contestant === c);
@@ -897,6 +917,172 @@ function WeeklyPicksForm({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function CategoryPicksForm({
+  template,
+  weeks,
+  categoryPicks,
+  categoryBusy,
+  categoryError,
+  onSubmitCategory,
+}: {
+  template: Template;
+  weeks: number;
+  categoryPicks: CategoryPick[];
+  categoryBusy: boolean;
+  categoryError: string;
+  onSubmitCategory: (week: number, draft: CategoryDraft) => Promise<boolean>;
+}) {
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [showContestants, setShowContestants] = useState(false);
+
+  const startingPick = categoryPicks.find((p) => p.week === 1);
+  const [draft, setDraft] = useState<CategoryDraft>({
+    starBaker: startingPick?.starBakerPick ?? "",
+    technical: startingPick?.technicalPick ?? "",
+    votedOff: startingPick?.votedOffPick ?? "",
+  });
+  const [editing, setEditing] = useState(!startingPick);
+
+  function changeWeek(w: number) {
+    setSelectedWeek(w);
+    const p = categoryPicks.find((x) => x.week === w);
+    setDraft({
+      starBaker: p?.starBakerPick ?? "",
+      technical: p?.technicalPick ?? "",
+      votedOff: p?.votedOffPick ?? "",
+    });
+    setEditing(!p);
+  }
+
+  function enterEdit() {
+    setDraft({
+      starBaker: existing?.starBakerPick ?? "",
+      technical: existing?.technicalPick ?? "",
+      votedOff: existing?.votedOffPick ?? "",
+    });
+    setEditing(true);
+  }
+
+  async function save() {
+    const ok = await onSubmitCategory(selectedWeek, draft);
+    if (ok) setEditing(false);
+  }
+
+  function saveFromModal(picked: CategoryDraft) {
+    setDraft(picked);
+    setShowContestants(false);
+  }
+
+  if (!template) return null;
+  const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
+  const existing = categoryPicks.find((p) => p.week === selectedWeek);
+  const canSave = !!draft.starBaker || !!draft.technical || !!draft.votedOff;
+  const categoryCast = findCategoryCast(template.contestants);
+
+  const SELECTS: { key: keyof CategoryDraft; label: string }[] = [
+    { key: "starBaker", label: "Star Baker" },
+    { key: "technical", label: "Wins the technical" },
+    { key: "votedOff", label: "Voted off" },
+  ];
+
+  return (
+    <div className="bg-card border border-cream/10 rounded-3xl p-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
+          <select
+            value={selectedWeek}
+            onChange={(e) => changeWeek(Number(e.target.value))}
+            className="px-3 py-2 rounded-lg bg-ink/60 border border-cream/15 text-cream text-sm outline-none"
+          >
+            {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
+              <option key={w} value={w}>
+                Week {w}
+              </option>
+            ))}
+          </select>
+        </div>
+        {editing ? (
+          categoryCast && (
+            <button
+              onClick={() => setShowContestants(true)}
+              className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
+            >
+              See Contestants
+            </button>
+          )
+        ) : (
+          existing && (
+            <button
+              onClick={enterEdit}
+              className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
+            >
+              <span aria-hidden>✎</span> Edit
+            </button>
+          )
+        )}
+      </div>
+      {selectedWeek === 1 && (
+        <p className="text-xs text-cream/40 mt-1 mb-1">Week 1 picks aren&apos;t scored — just for fun.</p>
+      )}
+      {categoryCast && showContestants && (
+        <CategoryPicksModal
+          cast={categoryCast.cast}
+          matches={categoryCast.matches}
+          eliminatedContestants={template.eliminatedContestants}
+          initial={draft}
+          onSave={saveFromModal}
+          onClose={() => setShowContestants(false)}
+        />
+      )}
+      {!editing && existing ? (
+        <div className="mt-3 flex flex-col gap-1">
+          <p className="text-sm text-cream/78">
+            Star Baker: <span className="font-semibold text-pink">{existing.starBakerPick || "—"}</span>
+          </p>
+          <p className="text-sm text-cream/78">
+            Wins the technical: <span className="font-semibold text-purple">{existing.technicalPick || "—"}</span>
+          </p>
+          <p className="text-sm text-cream/78">
+            Voted off: <span className="font-semibold text-lilac">{existing.votedOffPick || "—"}</span>
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-cream/55 mb-4 mt-3">Pick your prediction for each category.</p>
+          {categoryError && <p className="text-sm text-pink font-medium mb-3">{categoryError}</p>}
+          <div className="flex flex-col gap-2.5 mb-4">
+            {SELECTS.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-3">
+                <span className="w-36 text-sm text-cream/60 flex-none">{label}</span>
+                <select
+                  value={draft[key]}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, [key]: e.target.value }))}
+                  className="flex-1 px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                >
+                  <option value="">Choose a baker</option>
+                  {active.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={save}
+            disabled={!canSave || categoryBusy}
+            className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+          >
+            {categoryBusy ? "Saving…" : existing ? "Save" : "Save picks"}
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -4,6 +4,15 @@ import { useRouter } from "next/navigation";
 
 export type AdminRuleAward = { id: string; week: number; contestant: string; ruleId: string };
 export type AdminWeeklyScore = { id: string; week: number; contestant: string; score: number };
+export type AdminWeeklyResult = {
+  id: string;
+  week: number;
+  actualStarBaker: string | null;
+  actualTechnicalWinner: string | null;
+  actualVotedOff: string | null;
+  actualTechnicalLoser: string | null;
+  handshakes: unknown;
+};
 export type AdminScoringRule = { id: string; label: string; points: number; order: number };
 export type AdminScoringTemplate = {
   id: string;
@@ -16,6 +25,7 @@ export type AdminScoringTemplate = {
   rules: AdminScoringRule[];
   ruleAwards: AdminRuleAward[];
   weeklyScores: AdminWeeklyScore[];
+  weeklyResults: AdminWeeklyResult[];
   actualFinalFour: string[];
   actualWinner: string | null;
 };
@@ -113,6 +123,35 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
     }
   }
 
+  async function saveCategoryResult(payload: {
+    week: number;
+    actualStarBaker: string | null;
+    actualTechnicalWinner: string | null;
+    actualVotedOff: string | null;
+    actualTechnicalLoser: string | null;
+    handshakes: Record<string, number>;
+  }) {
+    if (!template) return;
+    setBusyKey("submit");
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}/category-result`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Couldn't save this week's results");
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save this week's results");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   async function toggleEliminated(contestant: string) {
     if (!template) return;
     const key = `eliminate:${contestant}`;
@@ -200,6 +239,15 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
           onToggleEliminated={toggleEliminated}
           onSaveActualResults={saveActualResults}
           onSubmitWeek={submitWeek}
+        />
+      ) : template.pickFormat === "WEEKLY_CATEGORIES" ? (
+        <WeeklyCategoriesScoring
+          template={template}
+          week={week}
+          activeContestants={activeContestants}
+          busyKey={busyKey}
+          onToggleEliminated={toggleEliminated}
+          onSaveResult={saveCategoryResult}
         />
       ) : (
         <DraftRulesScoring
@@ -444,6 +492,205 @@ function WeeklyTop3Scoring({
         <button
           onClick={() => onSubmitWeek(scoreChanges, awardChanges)}
           disabled={pendingCount === 0 || busyKey === "submit"}
+          className="px-5 py-2.5 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+        >
+          {busyKey === "submit" ? "Submitting…" : `Submit Week ${week}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// WEEKLY_CATEGORIES templates (Bake Off): the week's answer key — actual
+// Star Baker/technical winner/voted off/technical loser (single-select
+// each) plus handshake counts (a baker can get more than one). Same
+// "draft locally, submit once" pattern as the other scoring views.
+function WeeklyCategoriesScoring({
+  template,
+  week,
+  activeContestants,
+  busyKey,
+  onToggleEliminated,
+  onSaveResult,
+}: {
+  template: AdminScoringTemplate;
+  week: number;
+  activeContestants: string[];
+  busyKey: string | null;
+  onToggleEliminated: (contestant: string) => void;
+  onSaveResult: (payload: {
+    week: number;
+    actualStarBaker: string | null;
+    actualTechnicalWinner: string | null;
+    actualVotedOff: string | null;
+    actualTechnicalLoser: string | null;
+    handshakes: Record<string, number>;
+  }) => void;
+}) {
+  const existing = template.weeklyResults.find((r) => r.week === week) ?? null;
+  const existingHandshakes = (existing?.handshakes as Record<string, number> | null) ?? {};
+
+  function seed() {
+    return {
+      starBaker: existing?.actualStarBaker ?? "",
+      technical: existing?.actualTechnicalWinner ?? "",
+      votedOff: existing?.actualVotedOff ?? "",
+      technicalLoser: existing?.actualTechnicalLoser ?? "",
+      handshakes: { ...existingHandshakes },
+    };
+  }
+
+  const draftKey = `${template.id}-${week}`;
+  const [draft, setDraft] = useState(seed());
+  const [syncedKey, setSyncedKey] = useState(draftKey);
+  if (draftKey !== syncedKey) {
+    setSyncedKey(draftKey);
+    setDraft(seed());
+  }
+
+  function handshakeCount(c: string) {
+    return draft.handshakes[c] ?? 0;
+  }
+  function bumpHandshake(c: string, delta: number) {
+    setDraft((prev) => ({
+      ...prev,
+      handshakes: { ...prev.handshakes, [c]: Math.max(0, (prev.handshakes[c] ?? 0) + delta) },
+    }));
+  }
+
+  const dirty =
+    draft.starBaker !== (existing?.actualStarBaker ?? "") ||
+    draft.technical !== (existing?.actualTechnicalWinner ?? "") ||
+    draft.votedOff !== (existing?.actualVotedOff ?? "") ||
+    draft.technicalLoser !== (existing?.actualTechnicalLoser ?? "") ||
+    JSON.stringify(draft.handshakes) !== JSON.stringify(existingHandshakes);
+
+  function CategoryPicker({
+    label,
+    value,
+    onChange,
+  }: {
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+  }) {
+    return (
+      <div className="px-[18px] py-4 border-b border-[#EDEFF3] last:border-b-0">
+        <div className="text-sm font-semibold mb-2.5">{label}</div>
+        <div className="flex flex-wrap gap-1.5">
+          {activeContestants.map((c) => {
+            const selected = value === c;
+            return (
+              <button
+                key={c}
+                onClick={() => onChange(selected ? "" : c)}
+                className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                  selected
+                    ? "bg-purple/10 border-purple text-purple"
+                    : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                }`}
+              >
+                {selected ? "✓ " : ""}
+                {c}
+              </button>
+            );
+          })}
+          {activeContestants.length === 0 && (
+            <p className="text-xs text-[#8A909B]">No active contestants — add some in League Templates.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      {week === 1 && (
+        <div className="px-[18px] py-3 bg-[#FFF8E8] border border-[#F0D98C] rounded-lg text-sm text-[#8A6D1F]">
+          Week 1 isn&apos;t scored — you can still record results here for the record, but it won&apos;t affect anyone&apos;s points.
+        </div>
+      )}
+
+      <div className="bg-white border border-[#E2E4E9] rounded-lg">
+        <CategoryPicker label="Actual Star Baker" value={draft.starBaker} onChange={(v) => setDraft((p) => ({ ...p, starBaker: v }))} />
+        <CategoryPicker
+          label="Actual technical winner"
+          value={draft.technical}
+          onChange={(v) => setDraft((p) => ({ ...p, technical: v }))}
+        />
+        <CategoryPicker label="Actual voted off" value={draft.votedOff} onChange={(v) => setDraft((p) => ({ ...p, votedOff: v }))} />
+        <CategoryPicker
+          label="Actual last place in the technical"
+          value={draft.technicalLoser}
+          onChange={(v) => setDraft((p) => ({ ...p, technicalLoser: v }))}
+        />
+      </div>
+
+      <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
+        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">HOLLYWOOD HANDSHAKES</div>
+        <p className="text-xs text-[#8A909B] mb-3">A baker can get more than one in an episode.</p>
+        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+          {activeContestants.map((c) => (
+            <div key={c} className="flex items-center gap-2 px-3 py-2 rounded-md border border-[#EDEFF3] bg-[#F8F9FB]">
+              <span className="flex-1 text-sm truncate">{c}</span>
+              <button
+                onClick={() => bumpHandshake(c, -1)}
+                disabled={handshakeCount(c) === 0}
+                className="w-7 h-7 rounded-md border border-[#D6D9E0] bg-white text-sm font-bold disabled:opacity-30"
+              >
+                −
+              </button>
+              <span className="w-5 text-center text-sm font-semibold">{handshakeCount(c)}</span>
+              <button
+                onClick={() => bumpHandshake(c, 1)}
+                className="w-7 h-7 rounded-md border border-[#D6D9E0] bg-white text-sm font-bold"
+              >
+                +
+              </button>
+            </div>
+          ))}
+          {activeContestants.length === 0 && (
+            <p className="text-xs text-[#8A909B]">No active contestants — add some in League Templates.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
+        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">BAKER ELIMINATED</div>
+        <div className="flex flex-wrap gap-1.5">
+          {template.contestants.map((c) => {
+            const out = template.eliminatedContestants.includes(c);
+            return (
+              <button
+                key={c}
+                onClick={() => onToggleEliminated(c)}
+                disabled={busyKey === `eliminate:${c}`}
+                className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition disabled:opacity-50 ${
+                  out ? "bg-[#C2314E] text-white border-[#C2314E]" : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                }`}
+              >
+                {out ? "OUT — " : ""}
+                {c}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 px-[18px] py-3.5 bg-white border border-[#E2E4E9] rounded-lg">
+        <span className="text-[13px] text-[#5B6270]">{dirty ? "Changes ready to submit" : "No changes to submit"}</span>
+        <button
+          onClick={() =>
+            onSaveResult({
+              week,
+              actualStarBaker: draft.starBaker || null,
+              actualTechnicalWinner: draft.technical || null,
+              actualVotedOff: draft.votedOff || null,
+              actualTechnicalLoser: draft.technicalLoser || null,
+              handshakes: draft.handshakes,
+            })
+          }
+          disabled={!dirty || busyKey === "submit"}
           className="px-5 py-2.5 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
         >
           {busyKey === "submit" ? "Submitting…" : `Submit Week ${week}`}

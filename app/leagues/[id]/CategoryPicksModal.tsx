@@ -2,11 +2,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-// Cast photos for ROSTER-format leagues (draft-and-keep, unlike DWTS's
-// weekly top-three). Keyed by first name — add a new show's cast here (and
-// its images under public/<show>-cast/) the same way; the modal only shows
-// itself when a template's contestants actually match a list below.
-const ROSTER_CASTS: { name: string; photo: string }[][] = [
+// Cast photos for WEEKLY_CATEGORIES leagues. Keyed by first name — add a
+// new show's cast here (and its images under public/<show>-cast/) the
+// same way; the modal only shows itself when a template's contestants
+// actually match a list below.
+const CATEGORY_CASTS: { name: string; photo: string }[][] = [
   [
     { name: "Clara", photo: "/bake-off-cast/clara.webp" },
     { name: "Connie", photo: "/bake-off-cast/connie.webp" },
@@ -59,8 +59,6 @@ function fuzzyIncludes(contestant: string, personName: string) {
   );
 }
 
-// Greedily pairs each cast photo with (at most) one contestant string, in
-// cast-list order, so a photo can't be double-booked to two contestants.
 function matchCast(castList: { name: string; photo: string }[], contestants: string[]) {
   const castToContestant = new Map<string, string>();
   const claimed = new Set<string>();
@@ -75,11 +73,11 @@ function matchCast(castList: { name: string; photo: string }[], contestants: str
 }
 
 // Picks the cast list (if any) that covers this template's contestants —
-// so adding a future ROSTER show without a matching photo set just means no
-// "See Contestants" button shows up, instead of a half-empty gallery.
-export function findRosterCast(contestants: string[]) {
+// so a future WEEKLY_CATEGORIES show without a matching photo set just
+// falls back to plain dropdowns instead of a half-empty gallery.
+export function findCategoryCast(contestants: string[]) {
   let best: { cast: { name: string; photo: string }[]; matches: Map<string, string> } | null = null;
-  for (const cast of ROSTER_CASTS) {
+  for (const cast of CATEGORY_CASTS) {
     const matches = matchCast(cast, contestants);
     if (matches.size > 0 && (!best || matches.size > best.matches.size)) {
       best = { cast, matches };
@@ -88,61 +86,75 @@ export function findRosterCast(contestants: string[]) {
   return best;
 }
 
-type Pick = { id: string; contestant: string; memberId: string };
-type Member = { id: string; user: { name: string } };
+export type CategoryDraft = { starBaker: string; technical: string; votedOff: string };
 
-export function RosterContestantsModal({
+const SLOT_ORDER: (keyof CategoryDraft)[] = ["starBaker", "technical", "votedOff"];
+const SLOT_LABEL: Record<keyof CategoryDraft, string> = {
+  starBaker: "SB",
+  technical: "TW",
+  votedOff: "OUT",
+};
+const SLOT_COLOR: Record<keyof CategoryDraft, string> = {
+  starBaker: "bg-pink text-ink",
+  technical: "bg-purple text-cream",
+  votedOff: "bg-lilac text-ink",
+};
+
+export function CategoryPicksModal({
   cast,
   matches,
   eliminatedContestants,
-  picks,
-  members,
-  myMembershipId,
-  busy,
-  onDraft,
-  onUndraft,
+  initial,
+  onSave,
   onClose,
 }: {
   cast: { name: string; photo: string }[];
   matches: Map<string, string>;
   eliminatedContestants: string[];
-  picks: Pick[];
-  members: Member[];
-  myMembershipId: string | null;
-  busy: string | null;
-  onDraft: (contestant: string) => void;
-  onUndraft: (contestant: string) => void;
+  initial: CategoryDraft;
+  onSave: (draft: CategoryDraft) => void;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const [draft, setDraft] = useState<CategoryDraft>(initial);
+
   if (!mounted) return null;
 
-  const memberName = (memberId: string) => members.find((m) => m.id === memberId)?.user.name ?? "Someone";
+  function slotsFor(contestant: string) {
+    return SLOT_ORDER.filter((slot) => draft[slot] === contestant);
+  }
+
+  function handleTap(contestant: string) {
+    const occupied = slotsFor(contestant);
+    if (occupied.length > 0) {
+      // Already assigned somewhere — tapping again clears every slot it's in.
+      setDraft((prev) => {
+        const next = { ...prev };
+        for (const slot of occupied) next[slot] = "";
+        return next;
+      });
+      return;
+    }
+    const emptySlot = SLOT_ORDER.find((slot) => !draft[slot]);
+    if (!emptySlot) return;
+    setDraft((prev) => ({ ...prev, [emptySlot]: contestant }));
+  }
 
   function renderCard(person: { name: string; photo: string }) {
     const match = matches.get(person.name) ?? null;
     const isOut = match ? eliminatedContestants.includes(match) : false;
-    const pick = match ? picks.find((p) => p.contestant === match) : undefined;
-    const isMine = !!pick && pick.memberId === myMembershipId;
-    const isTaken = !!pick && !isMine;
-    const isBusy = match ? busy === match : false;
-    const clickable = !!match && !isOut && !isTaken && !isBusy && (isMine || !!myMembershipId);
-
-    function handleClick() {
-      if (!clickable || !match) return;
-      if (isMine) onUndraft(match);
-      else onDraft(match);
-    }
+    const slots = match ? slotsFor(match) : [];
+    const pickable = !!match && !isOut;
 
     return (
       <button
         key={person.name}
         type="button"
-        onClick={handleClick}
-        disabled={!clickable}
+        onClick={() => pickable && match && handleTap(match)}
+        disabled={!pickable}
         className={`relative flex flex-col items-center text-center gap-2.5 rounded-2xl p-1.5 transition ${
-          clickable ? "cursor-pointer hover:bg-cream/5" : isTaken || isOut ? "cursor-not-allowed opacity-60" : "cursor-not-allowed opacity-40"
+          pickable ? "cursor-pointer hover:bg-cream/5" : "cursor-not-allowed opacity-40"
         }`}
       >
         <div className="relative w-full">
@@ -150,9 +162,21 @@ export function RosterContestantsModal({
             src={person.photo}
             alt={person.name}
             className={`w-full aspect-square object-cover rounded-2xl border-2 transition ${
-              isMine ? "border-pink" : "border-cream/10"
+              slots.length > 0 ? "border-pink" : "border-cream/10"
             }`}
           />
+          {slots.length > 0 && (
+            <div className="absolute top-2 left-2 flex gap-1">
+              {slots.map((slot) => (
+                <span
+                  key={slot}
+                  className={`px-1.5 h-6 min-w-6 rounded-full font-display text-[10px] flex items-center justify-center shadow ${SLOT_COLOR[slot]}`}
+                >
+                  {SLOT_LABEL[slot]}
+                </span>
+              ))}
+            </div>
+          )}
           {isOut && (
             <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-ink/70">
               <span className="text-[10px] font-bold tracking-widest text-cream/70">ELIMINATED</span>
@@ -160,19 +184,17 @@ export function RosterContestantsModal({
           )}
         </div>
         <p className="text-sm font-semibold text-cream/85">{match ?? person.name}</p>
-        {isMine && <p className="text-[11px] font-bold text-pink -mt-1.5">yours · tap to drop</p>}
-        {isTaken && <p className="text-[11px] text-cream/40 -mt-1.5">{memberName(pick!.memberId)}</p>}
       </button>
     );
   }
 
-  const mine = cast.filter((p) => {
+  const pickedNames = new Set(SLOT_ORDER.map((slot) => draft[slot]).filter(Boolean));
+  const pickedPeople = cast.filter((p) => {
     const match = matches.get(p.name);
-    const pick = match ? picks.find((pk) => pk.contestant === match) : undefined;
-    return pick && pick.memberId === myMembershipId;
+    return match && pickedNames.has(match);
   });
-  const mineNames = new Set(mine.map((p) => p.name));
-  const rest = cast.filter((p) => !mineNames.has(p.name));
+  const restPeople = cast.filter((p) => !pickedPeople.includes(p));
+  const filledCount = SLOT_ORDER.filter((slot) => draft[slot]).length;
 
   return createPortal(
     <div
@@ -185,22 +207,45 @@ export function RosterContestantsModal({
       >
         <button
           onClick={onClose}
-          aria-label="Close"
+          aria-label="Close without saving"
           className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-cream/60 hover:text-cream hover:bg-cream/10 transition text-xl z-10"
         >
           ×
         </button>
         <div className="flex-none px-6 sm:px-8 pt-6 sm:pt-8 pb-1">
           <p className="font-script text-3xl text-pink leading-none mb-1">meet the bakers</p>
-          <h2 className="font-display text-2xl sm:text-3xl tracking-wide">THE TENT</h2>
-          <p className="text-sm text-cream/55 mt-1.5">Tap a photo to draft — first come, first served.</p>
+          <h2 className="font-display text-2xl sm:text-3xl tracking-wide">THIS WEEK&apos;S PICKS</h2>
+          <p className="text-sm text-cream/55 mt-1.5">
+            Tap a photo — first tap sets Star Baker, then Technical Winner, then Voted Off. Tap again to clear.{" "}
+            {filledCount}/3 picked.
+          </p>
+          <div className="flex items-center gap-3 mt-2 text-[11px] font-semibold text-cream/50">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-pink inline-block" /> Star Baker
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-purple inline-block" /> Technical Winner
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-lilac inline-block" /> Voted Off
+            </span>
+          </div>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 pt-4 pb-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {mine.map((person) => renderCard(person))}
-            {mine.length > 0 && <div className="col-span-full h-px bg-cream/15 -my-1.5" />}
-            {rest.map((person) => renderCard(person))}
+            {pickedPeople.map((person) => renderCard(person))}
+            {pickedPeople.length > 0 && <div className="col-span-full h-px bg-cream/15 -my-1.5" />}
+            {restPeople.map((person) => renderCard(person))}
           </div>
+        </div>
+        <div className="flex-none flex items-center justify-between gap-3 px-6 sm:px-8 py-4 border-t border-cream/10">
+          <p className="text-xs text-cream/45">Closing with × won&apos;t save changes.</p>
+          <button
+            onClick={() => onSave(draft)}
+            className="px-6 py-2.5 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition"
+          >
+            Save picks
+          </button>
         </div>
       </div>
     </div>,
