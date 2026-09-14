@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DRAFT_MODE_LABELS, formatDueDate, formatNextDueDate, isSeasonPredictionsLocked } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
+import { RosterContestantsModal, findRosterCast } from "./RosterContestantsModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type WeeklyPick = { id: string; week: number; topThree: string[]; songPrediction: string | null };
@@ -476,6 +477,8 @@ function DraftPool({
   onDraft: (contestant: string) => void;
   onUndraft: (contestant: string) => void;
 }) {
+  const [showContestants, setShowContestants] = useState(false);
+
   if (!template || template.contestants.length === 0) {
     return (
       <div className="bg-card border border-cream/10 rounded-2xl p-6 text-center">
@@ -488,21 +491,46 @@ function DraftPool({
 
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
   const memberName = (memberId: string) => members.find((m) => m.id === memberId)?.user.name ?? "Someone";
+  const rosterCast = findRosterCast(template.contestants);
 
   return (
     <div className="bg-card border border-cream/10 rounded-3xl p-6">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
         <h3 className="font-display text-xl tracking-wide">DRAFT POOL</h3>
-        {template.draftOpenDay && template.draftOpenTime && (
-          <span className="text-[11px] text-cream/40 font-semibold">
-            Picks open {formatDueDate(template.draftOpenDay, template.draftOpenTime)} PT
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {template.draftOpenDay && template.draftOpenTime && (
+            <span className="text-[11px] text-cream/40 font-semibold">
+              Picks open {formatDueDate(template.draftOpenDay, template.draftOpenTime)} PT
+            </span>
+          )}
+          {rosterCast && (
+            <button
+              onClick={() => setShowContestants(true)}
+              className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
+            >
+              See Contestants
+            </button>
+          )}
+        </div>
       </div>
       <p className="text-sm text-cream/55 mb-4">
         First come, first served — once someone drafts a contestant, they&apos;re off the board.
       </p>
       {error && <p className="text-sm text-pink font-medium mb-3">{error}</p>}
+      {rosterCast && showContestants && (
+        <RosterContestantsModal
+          cast={rosterCast.cast}
+          matches={rosterCast.matches}
+          eliminatedContestants={template.eliminatedContestants}
+          picks={picks}
+          members={members}
+          myMembershipId={myMembershipId}
+          busy={busy}
+          onDraft={onDraft}
+          onUndraft={onUndraft}
+          onClose={() => setShowContestants(false)}
+        />
+      )}
       <div className="flex flex-wrap gap-1.5">
         {active.map((c) => {
           const pick = picks.find((p) => p.contestant === c);
