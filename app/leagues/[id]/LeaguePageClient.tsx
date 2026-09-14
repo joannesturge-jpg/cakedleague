@@ -1006,25 +1006,32 @@ function CategoryPicksForm({
             ))}
           </select>
         </div>
-        {editing ? (
-          categoryCast && (
-            <button
-              onClick={() => setShowContestants(true)}
-              className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
-            >
-              See Contestants
-            </button>
-          )
-        ) : (
-          existing && (
-            <button
-              onClick={enterEdit}
-              className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
-            >
-              <span aria-hidden>✎</span> Edit
-            </button>
-          )
-        )}
+        <div className="flex items-center gap-3">
+          {template.draftOpenDay && template.draftOpenTime && (
+            <span className="text-[11px] text-cream/40 font-semibold">
+              Picks open {formatNextDueDate(template.draftOpenDay, template.draftOpenTime)} PT
+            </span>
+          )}
+          {editing ? (
+            categoryCast && (
+              <button
+                onClick={() => setShowContestants(true)}
+                className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
+              >
+                See Contestants
+              </button>
+            )
+          ) : (
+            existing && (
+              <button
+                onClick={enterEdit}
+                className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
+              >
+                <span aria-hidden>✎</span> Edit
+              </button>
+            )
+          )}
+        </div>
       </div>
       {selectedWeek === 1 && (
         <p className="text-xs text-cream/40 mt-1 mb-1">Week 1 picks aren&apos;t scored — just for fun.</p>
