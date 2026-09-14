@@ -26,6 +26,7 @@ export type AdminScoringTemplate = {
   ruleAwards: AdminRuleAward[];
   weeklyScores: AdminWeeklyScore[];
   weeklyResults: AdminWeeklyResult[];
+  weekThemes: unknown;
   actualFinalFour: string[];
   actualWinner: string | null;
 };
@@ -152,6 +153,28 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
     }
   }
 
+  async function saveWeekTheme(themeWeek: number, theme: string) {
+    if (!template) return;
+    const key = `theme:${themeWeek}`;
+    setBusyKey(key);
+    setError("");
+    const current = (template.weekThemes as Record<string, string> | null) ?? {};
+    const next = { ...current, [String(themeWeek)]: theme };
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekThemes: next }),
+      });
+      if (!res.ok) throw new Error("Couldn't save that theme");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that theme");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   async function toggleEliminated(contestant: string) {
     if (!template) return;
     const key = `eliminate:${contestant}`;
@@ -248,6 +271,7 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
           busyKey={busyKey}
           onToggleEliminated={toggleEliminated}
           onSaveResult={saveCategoryResult}
+          onSaveWeekTheme={saveWeekTheme}
         />
       ) : (
         <DraftRulesScoring
@@ -512,6 +536,7 @@ function WeeklyCategoriesScoring({
   busyKey,
   onToggleEliminated,
   onSaveResult,
+  onSaveWeekTheme,
 }: {
   template: AdminScoringTemplate;
   week: number;
@@ -526,9 +551,19 @@ function WeeklyCategoriesScoring({
     actualTechnicalLoser: string | null;
     handshakes: Record<string, number>;
   }) => void;
+  onSaveWeekTheme: (week: number, theme: string) => void;
 }) {
   const existing = template.weeklyResults.find((r) => r.week === week) ?? null;
   const existingHandshakes = (existing?.handshakes as Record<string, number> | null) ?? {};
+  const weekThemes = (template.weekThemes as Record<string, string> | null) ?? {};
+  const savedTheme = weekThemes[String(week)] ?? "";
+
+  const [themeDraft, setThemeDraft] = useState(savedTheme);
+  const [themeSyncedKey, setThemeSyncedKey] = useState(`${template.id}-${week}`);
+  if (`${template.id}-${week}` !== themeSyncedKey) {
+    setThemeSyncedKey(`${template.id}-${week}`);
+    setThemeDraft(savedTheme);
+  }
 
   function seed() {
     return {
@@ -605,6 +640,27 @@ function WeeklyCategoriesScoring({
 
   return (
     <div className="flex flex-col gap-3.5">
+      <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
+        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2">
+          WEEK {week} THEME
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            value={themeDraft}
+            onChange={(e) => setThemeDraft(e.target.value)}
+            placeholder="e.g. Cake Week"
+            className="flex-1 px-3 py-2 rounded-md border border-[#D6D9E0] bg-white text-sm outline-none focus:border-purple transition"
+          />
+          <button
+            onClick={() => onSaveWeekTheme(week, themeDraft)}
+            disabled={themeDraft === savedTheme || busyKey === `theme:${week}`}
+            className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+          >
+            {busyKey === `theme:${week}` ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+
       {week === 1 && (
         <div className="px-[18px] py-3 bg-[#FFF8E8] border border-[#F0D98C] rounded-lg text-sm text-[#8A6D1F]">
           Week 1 isn&apos;t scored — you can still record results here for the record, but it won&apos;t affect anyone&apos;s points.

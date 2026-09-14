@@ -29,6 +29,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
   if (typeof body.draftOpenDay === "string") data.draftOpenDay = body.draftOpenDay || null;
   if (typeof body.draftOpenTime === "string") data.draftOpenTime = body.draftOpenTime || null;
+  if (body.weekThemes && typeof body.weekThemes === "object" && !Array.isArray(body.weekThemes)) {
+    data.weekThemes = Object.fromEntries(
+      Object.entries(body.weekThemes as Record<string, unknown>)
+        .filter(([, v]) => typeof v === "string" && v.trim().length > 0)
+        .map(([week, v]) => [week, (v as string).trim()])
+    );
+  }
 
   const ops = [];
 

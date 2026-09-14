@@ -59,6 +59,9 @@ model LeagueTemplate {
   // — no drafting, predict Star Baker/Technical winner/Voted off from the
   // whole cast every week (Bake Off).
   pickFormat            String   @default("ROSTER")
+  // Week number -> theme name (e.g. {"1": "Cake Week"}), filled in as
+  // they're announced. A week with no entry just shows as "Week N".
+  weekThemes            Json     @default("{}")
 
   rules          LeagueTemplateRule[]
   leagues        League[]

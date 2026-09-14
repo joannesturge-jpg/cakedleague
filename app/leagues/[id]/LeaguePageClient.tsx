@@ -34,6 +34,7 @@ type Template = {
   draftOpenDay: string | null;
   draftOpenTime: string | null;
   pickFormat: string;
+  weekThemes: unknown;
 } | null;
 type League = {
   id: string;
@@ -982,6 +983,8 @@ function CategoryPicksForm({
   const existing = categoryPicks.find((p) => p.week === selectedWeek);
   const canSave = !!draft.starBaker || !!draft.technical || !!draft.votedOff;
   const categoryCast = findCategoryCast(template.contestants);
+  const weekThemes = (template.weekThemes as Record<string, string> | null) ?? {};
+  const weekTheme = (w: number) => weekThemes[String(w)] ?? "";
 
   const SELECTS: { key: keyof CategoryDraft; label: string }[] = [
     { key: "starBaker", label: "Star Baker" },
@@ -993,7 +996,9 @@ function CategoryPicksForm({
     <div className="bg-card border border-cream/10 rounded-3xl p-6">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
+          <h3 className="font-display text-xl tracking-wide">
+            WEEKLY PICKS{weekTheme(selectedWeek) && ` — ${weekTheme(selectedWeek).toUpperCase()}`}
+          </h3>
           <select
             value={selectedWeek}
             onChange={(e) => changeWeek(Number(e.target.value))}
@@ -1002,6 +1007,7 @@ function CategoryPicksForm({
             {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
               <option key={w} value={w}>
                 Week {w}
+                {weekTheme(w) ? ` — ${weekTheme(w)}` : ""}
               </option>
             ))}
           </select>

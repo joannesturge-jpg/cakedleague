@@ -33,6 +33,7 @@ export type AdminTemplateRow = {
     actualTechnicalLoser: string | null;
     handshakes: unknown;
   }[];
+  weekThemes: unknown;
   actualFinalFour: string[];
   actualWinner: string | null;
 };
