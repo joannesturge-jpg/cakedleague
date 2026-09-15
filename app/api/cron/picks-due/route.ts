@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     }
 
     const recipients = league.members.filter((m) => m.user.notifyPicksDue);
-    const dueLabel = formatNextDueDate(league.dueDay, league.dueTime, new Date(), league.startDate);
+    const dueLabel = formatNextDueDate(league.dueDay, league.dueTime, league.timezone, new Date(), league.startDate);
 
     await Promise.all(
       recipients.map((m) => sendPicksDueReminderEmail(m.user.email, m.user.id, dueLabel))

@@ -62,27 +62,79 @@ const WEEKDAY_INDEX: Record<string, number> = {
   SATURDAY: 6,
 };
 
-// The next real calendar date picks are due — always strictly in the
-// future. If today happens to be the due day, this rolls to next week
-// rather than "today": once that day arrives, the deadline that's
-// actually still ahead of a member is next week's, not the one for a
-// show that's already airing tonight.
+// Wall-clock calendar/time in a given IANA zone for some instant — needed
+// because the server runs in UTC, but a due day/time is meant in whatever
+// zone the commissioner picked for their league.
+function zonedParts(instant: Date, timezone: string) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(instant).map((p) => [p.type, p.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    // hour12:false renders midnight as "24" in some locales/environments.
+    hour: Number(parts.hour) % 24,
+    minute: Number(parts.minute),
+  };
+}
+
+// A pure calendar date (no time-of-day) as UTC midnight — lets day
+// arithmetic and weekday lookups skip DST entirely, and formatting it with
+// timeZone: "UTC" keeps the runtime's own local zone from reinterpreting
+// (and shifting) the date.
+function calendarDate(year: number, month: number, day: number) {
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+// The next real calendar date+time picks are due, in the league's own
+// zone — always strictly in the future. If today is the due day, this
+// only rolls to next week when the due time has already passed today; a
+// due time still later today is the very next occurrence, not next
+// week's.
 //
 // notBefore (a league's startDate) keeps this from landing on a Thursday
 // before the season has actually started — e.g. a show premiering Sep 25
 // shouldn't show "picks due" this coming Thursday if that Thursday is
 // still in August. Keeps advancing a week at a time until it's on or
 // after that date.
-export function nextDueDate(dueDay: string, from: Date = new Date(), notBefore?: Date | null) {
+export function nextDueDate(
+  dueDay: string,
+  dueTime: string,
+  timezone: string,
+  from: Date = new Date(),
+  notBefore?: Date | null
+) {
   const targetDay = WEEKDAY_INDEX[dueDay];
   if (targetDay === undefined) return null;
-  let diff = (targetDay - from.getDay() + 7) % 7;
-  if (diff === 0) diff = 7;
-  const result = new Date(from);
-  result.setDate(from.getDate() + diff);
-  while (notBefore && result.getTime() < notBefore.getTime()) {
-    result.setDate(result.getDate() + 7);
+  const [dueH, dueM] = dueTime.split(":").map(Number);
+
+  const now = zonedParts(from, timezone);
+  const today = calendarDate(now.year, now.month, now.day);
+
+  let diff = (targetDay - today.getUTCDay() + 7) % 7;
+  if (diff === 0 && (now.hour > dueH || (now.hour === dueH && now.minute >= dueM))) {
+    diff = 7;
   }
+
+  const result = new Date(today);
+  result.setUTCDate(today.getUTCDate() + diff);
+
+  if (notBefore) {
+    const start = zonedParts(notBefore, timezone);
+    const startDay = calendarDate(start.year, start.month, start.day);
+    while (result.getTime() < startDay.getTime()) {
+      result.setUTCDate(result.getUTCDate() + 7);
+    }
+  }
+
   return result;
 }
 
@@ -92,17 +144,18 @@ export function nextDueDate(dueDay: string, from: Date = new Date(), notBefore?:
 export function formatNextDueDate(
   dueDay: string,
   dueTime: string,
+  timezone: string,
   from: Date = new Date(),
   notBefore?: Date | null
 ) {
-  const date = nextDueDate(dueDay, from, notBefore);
+  const date = nextDueDate(dueDay, dueTime, timezone, from, notBefore);
   if (!date) return formatDueDate(dueDay, dueTime);
-  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
-  const month = date.toLocaleDateString("en-US", { month: "short" });
+  const weekday = date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+  const month = date.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
   const [h, m] = dueTime.split(":").map(Number);
   const period = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${weekday}, ${month} ${date.getDate()} at ${hour12}:${String(m).padStart(2, "0")} ${period}`;
+  return `${weekday}, ${month} ${date.getUTCDate()} at ${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
 export function formatMoney(cents: number) {

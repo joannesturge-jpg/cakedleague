@@ -10,6 +10,7 @@ import {
   DUE_DAY_LABELS,
   TIMEZONES,
   TIMEZONE_ABBR,
+  DEFAULT_TIMEZONE,
 } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
@@ -455,6 +456,7 @@ export function LeaguePageClient({
                     {formatNextDueDate(
                       dueDay,
                       dueTime,
+                      timezone,
                       new Date(),
                       league.startDate ? new Date(league.startDate) : null
                     )}{" "}
@@ -1140,7 +1142,7 @@ function CategoryPicksForm({
         <div className="flex items-center gap-3">
           {template.draftOpenDay && template.draftOpenTime && (
             <span className="text-[11px] text-cream/40 font-semibold">
-              Picks open {formatNextDueDate(template.draftOpenDay, template.draftOpenTime)} PT
+              Picks open {formatNextDueDate(template.draftOpenDay, template.draftOpenTime, DEFAULT_TIMEZONE)} PT
             </span>
           )}
           {editing ? (
