@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     const dueLabel = formatNextDueDate(league.dueDay, league.dueTime, new Date(), league.startDate);
 
     await Promise.all(
-      recipients.map((m) => sendPicksDueReminderEmail(m.user.email, m.user.id, league.name, dueLabel, league.id))
+      recipients.map((m) => sendPicksDueReminderEmail(m.user.email, m.user.id, dueLabel))
     );
 
     await prisma.league.update({ where: { id: league.id }, data: { lastPicksReminderSentAt: new Date() } });
