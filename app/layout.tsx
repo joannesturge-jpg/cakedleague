@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { LogoutButton } from "@/app/components/LogoutButton";
+import { MobileNav } from "@/app/components/MobileNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <span className="font-script text-2xl text-pink">leagues</span>
           </Link>
 
-          <nav className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
+          <nav className="hidden sm:flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
             <Link
               href="/"
               className="px-3.5 py-2 rounded-full text-sm font-semibold text-cream/55 hover:text-cream transition whitespace-nowrap"
@@ -73,7 +74,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </Link>
           </nav>
 
-          <div className="flex items-center gap-2.5 flex-none">
+          <div className="hidden sm:flex items-center gap-2.5 flex-none">
             {user ? (
               <>
                 <Link
@@ -101,6 +102,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </>
             )}
           </div>
+
+          <MobileNav isLoggedIn={!!user} />
         </header>
         <main>{children}</main>
       </body>

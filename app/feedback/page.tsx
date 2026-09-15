@@ -3,6 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 
 export default function FeedbackPage() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [text, setText] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -16,7 +18,7 @@ export default function FeedbackPage() {
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ name, email, text }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Couldn't send that — try again?");
@@ -49,12 +51,43 @@ export default function FeedbackPage() {
             </div>
           ) : (
             <>
+              <div className="grid gap-3 mb-3.5 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="feedback-name" className="block text-[11px] font-bold tracking-widest text-cream/46 mb-1.5">
+                    NAME (OPTIONAL)
+                  </label>
+                  <input
+                    id="feedback-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full px-4 py-3 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="feedback-email" className="block text-[11px] font-bold tracking-widest text-cream/46 mb-1.5">
+                    EMAIL (OPTIONAL)
+                  </label>
+                  <input
+                    id="feedback-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-3 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                  />
+                </div>
+              </div>
+              <label htmlFor="feedback-text" className="block text-[11px] font-bold tracking-widest text-cream/46 mb-1.5">
+                YOUR FEEDBACK
+              </label>
               <textarea
+                id="feedback-text"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                rows={6}
+                rows={10}
                 placeholder="What's on your mind?"
-                className="w-full px-4 py-3.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition resize-none"
+                className="w-full px-4 py-3.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition resize-y"
               />
               {error && <p className="text-sm text-pink font-medium mt-3">{error}</p>}
               <button

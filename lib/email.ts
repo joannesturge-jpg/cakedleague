@@ -62,7 +62,7 @@ export async function sendFeedbackEmail(text: string, from: { name: string; emai
   const { error } = await resend.emails.send({
     from: FROM,
     to,
-    replyTo: from?.email,
+    replyTo: from?.email || undefined,
     subject: "New Caked Leagues feedback",
     html: `
       <p><strong>From:</strong> ${senderLine}</p>

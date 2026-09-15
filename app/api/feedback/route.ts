@@ -14,7 +14,12 @@ export async function POST(request: Request) {
   }
 
   const user = await getCurrentUser();
-  await sendFeedbackEmail(text, user ? { name: user.name, email: user.email } : null);
+  const formName = typeof body.name === "string" ? body.name.trim() : "";
+  const formEmail = typeof body.email === "string" ? body.email.trim() : "";
+  const name = formName || user?.name || "";
+  const email = formEmail || user?.email || "";
+
+  await sendFeedbackEmail(text, name || email ? { name: name || "Someone", email } : null);
 
   return NextResponse.json({ ok: true });
 }
