@@ -35,7 +35,17 @@ export default function FeedbackPage() {
       <div className="w-full max-w-lg">
         <p className="font-script text-3xl text-pink leading-none mb-1">we're listening</p>
         <h1 className="font-display text-4xl tracking-wide mb-2">SHARE FEEDBACK</h1>
-        <p className="text-cream/60 mb-8">Bug, idea, or just a rant about your league. All of it helps.</p>
+        <p className="text-cream/60 mb-6">Bug, idea, or just a rant about your league. All of it helps.</p>
+
+        <Link
+          href="/how-it-works"
+          className="flex items-center justify-between gap-3 px-5 py-3.5 rounded-2xl bg-card border border-cream/12 mb-8 hover:border-cream/25 transition"
+        >
+          <span className="text-sm text-cream/70">
+            Not sure how something works? Check the <span className="text-cream font-semibold">How It Works</span> page first.
+          </span>
+          <span className="text-pink font-bold text-sm flex-none">&rarr;</span>
+        </Link>
 
         <div className="bg-card border border-cream/12 rounded-3xl p-7">
           {sent ? (
