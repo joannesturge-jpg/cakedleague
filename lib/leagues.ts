@@ -52,21 +52,35 @@ const WEEKDAY_INDEX: Record<string, number> = {
 // rather than "today": once that day arrives, the deadline that's
 // actually still ahead of a member is next week's, not the one for a
 // show that's already airing tonight.
-export function nextDueDate(dueDay: string, from: Date = new Date()) {
+//
+// notBefore (a league's startDate) keeps this from landing on a Thursday
+// before the season has actually started — e.g. a show premiering Sep 25
+// shouldn't show "picks due" this coming Thursday if that Thursday is
+// still in August. Keeps advancing a week at a time until it's on or
+// after that date.
+export function nextDueDate(dueDay: string, from: Date = new Date(), notBefore?: Date | null) {
   const targetDay = WEEKDAY_INDEX[dueDay];
   if (targetDay === undefined) return null;
   let diff = (targetDay - from.getDay() + 7) % 7;
   if (diff === 0) diff = 7;
   const result = new Date(from);
   result.setDate(from.getDate() + diff);
+  while (notBefore && result.getTime() < notBefore.getTime()) {
+    result.setDate(result.getDate() + 7);
+  }
   return result;
 }
 
 // Like formatDueDate, but as a concrete upcoming date ("Tuesday, Sep 15 at
 // 8:00 PM") instead of a generic recurring label — so the one day a week
 // this actually matches "today" doesn't read as "due right now."
-export function formatNextDueDate(dueDay: string, dueTime: string, from: Date = new Date()) {
-  const date = nextDueDate(dueDay, from);
+export function formatNextDueDate(
+  dueDay: string,
+  dueTime: string,
+  from: Date = new Date(),
+  notBefore?: Date | null
+) {
+  const date = nextDueDate(dueDay, from, notBefore);
   if (!date) return formatDueDate(dueDay, dueTime);
   const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
   const month = date.toLocaleDateString("en-US", { month: "short" });

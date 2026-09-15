@@ -47,6 +47,7 @@ type League = {
   scoringPerWeek: number | null;
   dueDay: string;
   dueTime: string;
+  startDate: string | Date | null;
   draftMode: string;
   entryFeeEnabled: boolean;
   entryFeeAmount: number | null;
@@ -345,7 +346,14 @@ export function LeaguePageClient({
 
           <div className="flex items-center justify-between gap-4 flex-wrap p-5 rounded-2xl bg-pink/10 border border-pink/35 mb-3">
             <div className="text-[10.5px] tracking-widest text-pink font-bold">PICKS DUE</div>
-            <div className="font-display text-xl tracking-wide">{formatNextDueDate(league.dueDay, league.dueTime)}</div>
+            <div className="font-display text-xl tracking-wide">
+              {formatNextDueDate(
+                league.dueDay,
+                league.dueTime,
+                new Date(),
+                league.startDate ? new Date(league.startDate) : null
+              )}
+            </div>
           </div>
 
           <button

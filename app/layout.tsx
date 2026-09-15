@@ -3,7 +3,6 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { LogoutButton } from "@/app/components/LogoutButton";
-import { FeedbackModal } from "@/app/components/FeedbackModal";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,11 +44,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               Home
             </Link>
             <Link
-              href={user ? "/dashboard" : "/leagues"}
+              href="/leagues"
               className="px-3.5 py-2 rounded-full text-sm font-semibold text-cream/55 hover:text-cream transition whitespace-nowrap"
             >
-              {user ? "My Leagues" : "Leagues"}
+              Public Leagues
             </Link>
+            {user && (
+              <Link
+                href="/dashboard"
+                className="px-3.5 py-2 rounded-full text-sm font-semibold text-cream/55 hover:text-cream transition whitespace-nowrap"
+              >
+                My Leagues
+              </Link>
+            )}
             <a
               href="https://buymeacoffee.com/cakedfantasy"
               target="_blank"
@@ -58,7 +65,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             >
               ☕ Buy me a coffee
             </a>
-            <FeedbackModal />
+            <Link
+              href="/feedback"
+              className="px-3.5 py-2 rounded-full text-sm font-semibold text-cream/55 hover:text-cream transition whitespace-nowrap"
+            >
+              Share feedback
+            </Link>
           </nav>
 
           <div className="flex items-center gap-2.5 flex-none">

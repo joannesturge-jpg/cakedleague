@@ -16,11 +16,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
 
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  const tomorrowDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const tomorrow = tomorrowDate
     .toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" })
     .toUpperCase();
 
-  const leagues = await prisma.league.findMany({
+  const leaguesMatchingDay = await prisma.league.findMany({
     where: { dueDay: tomorrow, deletedAt: null },
     include: {
       members: {
@@ -29,6 +30,13 @@ export async function GET(request: Request) {
       },
     },
   });
+
+  // Skip a league whose season hasn't actually started yet — dueDay alone
+  // would otherwise fire reminders for a recurring weekday before the show
+  // has aired a single episode.
+  const leagues = leaguesMatchingDay.filter(
+    (l) => !l.startDate || l.startDate.getTime() <= tomorrowDate.getTime()
+  );
 
   const TWENTY_HOURS_MS = 20 * 60 * 60 * 1000;
   const now = Date.now();
@@ -40,7 +48,7 @@ export async function GET(request: Request) {
     }
 
     const recipients = league.members.filter((m) => m.user.notifyPicksDue);
-    const dueLabel = formatNextDueDate(league.dueDay, league.dueTime);
+    const dueLabel = formatNextDueDate(league.dueDay, league.dueTime, new Date(), league.startDate);
 
     await Promise.all(
       recipients.map((m) => sendPicksDueReminderEmail(m.user.email, m.user.id, league.name, dueLabel, league.id))
