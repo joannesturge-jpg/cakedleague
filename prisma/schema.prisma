@@ -171,6 +171,9 @@ model League {
   scoringPerWeek Int?
   dueDay         String
   dueTime        String
+  // IANA zone the commissioner picked for dueTime — lets members see PT/MT/CT/ET
+  // instead of guessing which zone a bare time means.
+  timezone       String   @default("America/Los_Angeles")
   lastPicksReminderSentAt DateTime?
 
   draftMode            String

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateInviteCode } from "@/lib/invite";
 import { sendLeagueCreatedEmail } from "@/lib/email";
+import { TIMEZONES, DEFAULT_TIMEZONE } from "@/lib/leagues";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -61,6 +62,10 @@ export async function POST(request: Request) {
       scoringPerWeek: typeof body.scoringPerWeek === "number" ? body.scoringPerWeek : null,
       dueDay: body.dueDay,
       dueTime: body.dueTime,
+      timezone:
+        typeof body.timezone === "string" && TIMEZONES.some((t) => t.id === body.timezone)
+          ? body.timezone
+          : DEFAULT_TIMEZONE,
       draftMode: body.draftMode,
       draftModeDescription:
         typeof body.draftModeDescription === "string" && body.draftModeDescription.trim()

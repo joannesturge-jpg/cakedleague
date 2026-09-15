@@ -10,6 +10,21 @@ export const DUE_DAY_LABELS: Record<string, string> = {
   SUNDAY: "Sun",
 };
 
+// IANA zone stored on the league; the short label is what members see next
+// to a due date/time so it's unambiguous which zone the commissioner meant.
+export const TIMEZONES = [
+  { id: "America/Los_Angeles", label: "Pacific", abbr: "PT" },
+  { id: "America/Denver", label: "Mountain", abbr: "MT" },
+  { id: "America/Chicago", label: "Central", abbr: "CT" },
+  { id: "America/New_York", label: "Eastern", abbr: "ET" },
+] as const;
+
+export const TIMEZONE_ABBR: Record<string, string> = Object.fromEntries(
+  TIMEZONES.map((t) => [t.id, t.abbr])
+);
+
+export const DEFAULT_TIMEZONE = "America/Los_Angeles";
+
 export const DRAFT_MODES = [
   { id: "SNAKE", name: "Snake draft", desc: "Pick order reverses each round so everyone gets a fair shot at the best picks." },
   { id: "AUCTION", name: "Auction", desc: "Everyone gets a budget and bids on who they want." },

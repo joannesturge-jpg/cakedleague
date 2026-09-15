@@ -7,6 +7,8 @@ import {
   DRAFT_MODES,
   PAY_METHODS,
   LEAGUE_EMOJIS,
+  TIMEZONES,
+  DEFAULT_TIMEZONE,
 } from "@/lib/leagues";
 
 type TemplateRule = { id: string; label: string; points: number };
@@ -72,6 +74,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
   const [scoringPerWeek, setScoringPerWeek] = useState(templates[0]?.scoringPerWeek ?? 1);
   const [dueDay, setDueDay] = useState(templates[0]?.dueDay ?? "SUNDAY");
   const [dueTime, setDueTime] = useState("20:00");
+  const [timezone, setTimezone] = useState<string>(DEFAULT_TIMEZONE);
 
   const [draftMode, setDraftMode] = useState(templates[0]?.draftMode ?? "SNAKE");
   const [draftModeDescription, setDraftModeDescription] = useState("");
@@ -133,6 +136,7 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
           scoringPerWeek: template ? null : scoringPerWeek,
           dueDay,
           dueTime,
+          timezone,
           draftMode,
           draftModeDescription,
           entryFeeEnabled,
@@ -377,6 +381,15 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
                 <Field label="Time">
                   <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} className={inputClass} />
                 </Field>
+                <Field label="Time zone">
+                  <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={inputClass}>
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz.id} value={tz.id}>
+                        {tz.label} ({tz.abbr})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
             </div>
           </div>
@@ -517,7 +530,10 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
             <div className="grid gap-3 mb-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
               <Fact label="Template" value={template ? template.name : "Custom"} />
               <Fact label="Drafting" value={DRAFT_MODES.find((d) => d.id === draftMode)?.name ?? draftMode} />
-              <Fact label="Picks due" value={`${DUE_DAY_LABELS[dueDay]}s, ${dueTime}`} />
+              <Fact
+                label="Picks due"
+                value={`${DUE_DAY_LABELS[dueDay]}s, ${dueTime} ${TIMEZONES.find((t) => t.id === timezone)?.abbr ?? ""}`}
+              />
               <Fact label="Visibility" value="Private" />
               <Fact label="Entry fee" value={entryFeeEnabled ? `$${entryFeeAmount} via ${entryFeePayMethod}` : "None"} />
               <Fact label="Prize" value={prizeEnabled ? `${prizePlaces} place${prizePlaces > 1 ? "s" : ""} pay out` : "None"} />

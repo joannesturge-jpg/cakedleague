@@ -1,7 +1,16 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { DRAFT_MODE_LABELS, formatDueDate, formatNextDueDate, isSeasonPredictionsLocked } from "@/lib/leagues";
+import {
+  DRAFT_MODE_LABELS,
+  formatDueDate,
+  formatNextDueDate,
+  isSeasonPredictionsLocked,
+  DUE_DAYS,
+  DUE_DAY_LABELS,
+  TIMEZONES,
+  TIMEZONE_ABBR,
+} from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
 
@@ -47,6 +56,7 @@ type League = {
   scoringPerWeek: number | null;
   dueDay: string;
   dueTime: string;
+  timezone: string;
   startDate: string | Date | null;
   draftMode: string;
   entryFeeEnabled: boolean;
@@ -250,6 +260,42 @@ export function LeaguePageClient({
     }
   }
 
+  const [dueDay, setDueDayValue] = useState(league.dueDay);
+  const [dueTime, setDueTimeValue] = useState(league.dueTime);
+  const [timezone, setTimezoneValue] = useState(league.timezone);
+  const [dueDateEditing, setDueDateEditing] = useState(false);
+  const [dueDateDraft, setDueDateDraft] = useState({ dueDay, dueTime, timezone });
+  const [dueDateSaving, setDueDateSaving] = useState(false);
+  const [dueDateError, setDueDateError] = useState("");
+
+  function enterDueDateEdit() {
+    setDueDateDraft({ dueDay, dueTime, timezone });
+    setDueDateError("");
+    setDueDateEditing(true);
+  }
+
+  async function saveDueDate() {
+    setDueDateSaving(true);
+    setDueDateError("");
+    try {
+      const res = await fetch(`/api/leagues/${league.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dueDateDraft),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't save that");
+      setDueDayValue(data.dueDay);
+      setDueTimeValue(data.dueTime);
+      setTimezoneValue(data.timezone);
+      setDueDateEditing(false);
+    } catch (err) {
+      setDueDateError(err instanceof Error ? err.message : "Couldn't save that");
+    } finally {
+      setDueDateSaving(false);
+    }
+  }
+
   const weeks = league.weeks ?? undefined;
   const scoringPerWeek = league.scoringPerWeek ?? undefined;
   const hasCustomRules = league.rules.some((r) => r.isCustom);
@@ -344,16 +390,87 @@ export function LeaguePageClient({
             ))}
           </div>
 
-          <div className="flex items-center justify-between gap-4 flex-wrap p-5 rounded-2xl bg-pink/10 border border-pink/35 mb-3">
-            <div className="text-[10.5px] tracking-widest text-pink font-bold">PICKS DUE</div>
-            <div className="font-display text-xl tracking-wide">
-              {formatNextDueDate(
-                league.dueDay,
-                league.dueTime,
-                new Date(),
-                league.startDate ? new Date(league.startDate) : null
-              )}
-            </div>
+          <div className="p-5 rounded-2xl bg-pink/10 border border-pink/35 mb-3">
+            {dueDateEditing ? (
+              <>
+                <div className="text-[10.5px] tracking-widest text-pink font-bold mb-3">EDIT PICKS DUE</div>
+                {dueDateError && <p className="text-sm text-pink font-medium mb-2">{dueDateError}</p>}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {DUE_DAYS.map((d) => {
+                    const selected = dueDateDraft.dueDay === d;
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => setDueDateDraft((prev) => ({ ...prev, dueDay: d }))}
+                        className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                          selected ? "border-pink bg-pink/15 text-pink" : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
+                        }`}
+                      >
+                        {DUE_DAY_LABELS[d]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2.5 flex-wrap mb-4">
+                  <input
+                    type="time"
+                    value={dueDateDraft.dueTime}
+                    onChange={(e) => setDueDateDraft((prev) => ({ ...prev, dueTime: e.target.value }))}
+                    className="px-3 py-2.5 rounded-lg bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                  />
+                  <select
+                    value={dueDateDraft.timezone}
+                    onChange={(e) => setDueDateDraft((prev) => ({ ...prev, timezone: e.target.value }))}
+                    className="px-3 py-2.5 rounded-lg bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz.id} value={tz.id}>
+                        {tz.label} ({tz.abbr})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={saveDueDate}
+                    disabled={dueDateSaving}
+                    className="px-5 py-2.5 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+                  >
+                    {dueDateSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setDueDateEditing(false)}
+                    disabled={dueDateSaving}
+                    className="text-sm font-semibold text-cream/50 hover:text-cream transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="text-[10.5px] tracking-widest text-pink font-bold">PICKS DUE</div>
+                <div className="flex items-center gap-3">
+                  <div className="font-display text-xl tracking-wide">
+                    {formatNextDueDate(
+                      dueDay,
+                      dueTime,
+                      new Date(),
+                      league.startDate ? new Date(league.startDate) : null
+                    )}{" "}
+                    {TIMEZONE_ABBR[timezone] ?? ""}
+                  </div>
+                  {isOwner && (
+                    <button
+                      onClick={enterDueDateEdit}
+                      className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
+                    >
+                      <span aria-hidden>✎</span> Edit
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <button
