@@ -572,6 +572,7 @@ export function LeaguePageClient({
               <CategoryPicksForm
                 template={league.template}
                 weeks={league.weeks ?? 10}
+                startDate={league.startDate}
                 categoryPicks={categoryPicks}
                 categoryBusy={categoryBusy}
                 categoryError={categoryError}
@@ -1085,6 +1086,7 @@ function WeeklyPicksForm({
 function CategoryPicksForm({
   template,
   weeks,
+  startDate,
   categoryPicks,
   categoryBusy,
   categoryError,
@@ -1092,6 +1094,7 @@ function CategoryPicksForm({
 }: {
   template: Template;
   weeks: number;
+  startDate: string | Date | null;
   categoryPicks: CategoryPick[];
   categoryBusy: boolean;
   categoryError: string;
@@ -1175,7 +1178,15 @@ function CategoryPicksForm({
         <div className="flex items-center gap-3">
           {template.draftOpenDay && template.draftOpenTime && (
             <span className="text-[11px] text-cream/40 font-semibold">
-              Picks open {formatNextDueDate(template.draftOpenDay, template.draftOpenTime, DEFAULT_TIMEZONE)} PT
+              Picks open{" "}
+              {formatNextDueDate(
+                template.draftOpenDay,
+                template.draftOpenTime,
+                DEFAULT_TIMEZONE,
+                new Date(),
+                startDate ? new Date(startDate) : null
+              )}{" "}
+              PT
             </span>
           )}
           {selectedWeek === 1 ? null : editing ? (
