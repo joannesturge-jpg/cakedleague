@@ -52,6 +52,7 @@ type Template = {
   actualWinner: string | null;
   actualFinalFour: string[];
   weeklyScores: { week: number; contestant: string; score: number }[];
+  ruleAwards: { week: number; contestant: string; rule: { label: string } }[];
 } | null;
 type League = {
   id: string;
@@ -1388,7 +1389,12 @@ function DwtsLeaderboard({ league }: { league: League }) {
   if (!template) return null;
 
   const hasAnyResults =
-    template.weeklyScores.length > 0 || !!template.actualWinner || template.actualFinalFour.length > 0;
+    template.weeklyScores.length > 0 ||
+    template.ruleAwards.length > 0 ||
+    !!template.actualWinner ||
+    template.actualFinalFour.length > 0;
+
+  const ruleAwards = template.ruleAwards.map((a) => ({ week: a.week, contestant: a.contestant, ruleLabel: a.rule.label }));
 
   const standings = league.members
     .map((m) => ({
@@ -1398,6 +1404,7 @@ function DwtsLeaderboard({ league }: { league: League }) {
         finalFourPicks: m.finalFourPicks,
         weeklyPicks: m.weeklyPicks,
         weeklyScores: template.weeklyScores,
+        ruleAwards,
         actualWinner: template.actualWinner,
         actualFinalFour: template.actualFinalFour,
         eliminatedContestants: template.eliminatedContestants,

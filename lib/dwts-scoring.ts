@@ -1,18 +1,22 @@
-// WEEKLY_TOP3 scoring (DWTS). Covers what's unambiguously derivable from
-// stored data: the weekly top-three prediction, the season winner pick,
-// and the final four pre-season prediction. Point values come from the
-// league's own rules (a commissioner may have customized them), matched
-// by label the same way the admin scoring screen classifies rules.
+// WEEKLY_TOP3 scoring (DWTS). Covers the weekly top-three prediction, the
+// season winner pick, the final four pre-season prediction, and the
+// injured/falls bonus rules. Point values come from the league's own
+// rules (a commissioner may have customized them), matched by label the
+// same way the admin scoring screen classifies rules.
 //
-// Two seeded rules are deliberately left out of this calculation:
-// "Weekly song prediction is correct" (already documented as scored
-// manually by each commissioner from their league page) and the
-// "Contestant injured/falls" bonuses (no unambiguous way to attribute
-// those to a member in this pick format — nothing pins a couple to a
-// member for a given week besides that week's top-three guess).
+// "Weekly song prediction is correct" is the one seeded rule left out —
+// already documented as scored manually by each commissioner from their
+// league page, not something this engine touches.
+//
+// Injured/falls attribution: the admin marks a couple injured/fallen for
+// a given week (a template-wide fact, same as an actual top-three
+// result). A member only gets that bonus/penalty if that couple was in
+// *their own* top-three pick for that same week — nothing else ties a
+// couple to a member in this pick format.
 export type DwtsWeeklyScoreEntry = { week: number; contestant: string; score: number };
 export type DwtsWeeklyPick = { week: number; topThree: string[] };
 export type DwtsRule = { label: string; points: number };
+export type DwtsRuleAward = { week: number; contestant: string; ruleLabel: string };
 
 function pointsForLabel(rules: DwtsRule[], pattern: RegExp, fallback: number) {
   const match = rules.find((r) => pattern.test(r.label));
@@ -78,20 +82,53 @@ export function scoreFinalFour(picks: string[], actualFinalFour: string[]): numb
   return picks.filter((c) => actualFinalFour.includes(c)).length * 5;
 }
 
+export function scoreWeeklyBonusAwards(
+  weeklyPicks: DwtsWeeklyPick[],
+  awards: DwtsRuleAward[],
+  rules: DwtsRule[]
+): number {
+  const injuredPattern = /injured/i;
+  const fallsPattern = /falls/i;
+  let total = 0;
+  for (const award of awards) {
+    const isInjured = injuredPattern.test(award.ruleLabel);
+    const isFalls = !isInjured && fallsPattern.test(award.ruleLabel);
+    if (!isInjured && !isFalls) continue;
+
+    const pick = weeklyPicks.find((p) => p.week === award.week);
+    if (!pick || !pick.topThree.includes(award.contestant)) continue;
+
+    total += isInjured ? pointsForLabel(rules, injuredPattern, 5) : pointsForLabel(rules, fallsPattern, -5);
+  }
+  return total;
+}
+
 export function scoreDwtsMember(params: {
   winnerPick: string | null;
   finalFourPicks: string[];
   weeklyPicks: DwtsWeeklyPick[];
   weeklyScores: DwtsWeeklyScoreEntry[];
+  ruleAwards: DwtsRuleAward[];
   actualWinner: string | null;
   actualFinalFour: string[];
   eliminatedContestants: string[];
   rules: DwtsRule[];
 }): number {
-  const { winnerPick, finalFourPicks, weeklyPicks, weeklyScores, actualWinner, actualFinalFour, eliminatedContestants, rules } = params;
+  const {
+    winnerPick,
+    finalFourPicks,
+    weeklyPicks,
+    weeklyScores,
+    ruleAwards,
+    actualWinner,
+    actualFinalFour,
+    eliminatedContestants,
+    rules,
+  } = params;
 
   let total = scoreSeasonWinner(winnerPick, actualWinner, eliminatedContestants, rules);
   total += scoreFinalFour(finalFourPicks, actualFinalFour);
+  total += scoreWeeklyBonusAwards(weeklyPicks, ruleAwards, rules);
 
   const scoresByWeek = new Map<number, DwtsWeeklyScoreEntry[]>();
   for (const s of weeklyScores) {
