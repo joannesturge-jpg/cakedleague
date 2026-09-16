@@ -301,6 +301,24 @@ model LeagueMemberCategoryPick {
   @@index([memberId])
 }
 
+// One row per page load, written by /api/track (never for admin users —
+// filtered out at write time, not read time, so admin browsing never
+// pollutes the traffic numbers). visitorId is an anonymous cookie set by
+// middleware, independent of login — lets us count real visitors,
+// logged in or not. Sessions/duration are derived at query time by
+// grouping a visitor's rows with gaps under 30 minutes, not stored.
+model PageView {
+  id        String   @id @default(cuid())
+  path      String
+  visitorId String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([visitorId, createdAt])
+  @@index([path])
+  @@index([createdAt])
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   tokenHash String    @unique

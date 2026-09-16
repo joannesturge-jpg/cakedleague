@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { MobileNav } from "@/app/components/MobileNav";
+import { Analytics } from "@/app/components/Analytics";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body className="bg-ink text-cream font-sans">
+        <Analytics />
         <header className="sticky top-0 z-50 flex items-center justify-between gap-3 flex-wrap px-5 sm:px-7 py-3 bg-ink/90 backdrop-blur-md border-b border-cream/10">
           <Link href="/" className="flex items-baseline gap-2 flex-none">
             <span className="font-display text-2xl tracking-wide">CAKED</span>

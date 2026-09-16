@@ -22,6 +22,12 @@ export type AdminAnalyticsData = {
   topTemplates: { name: string; count: number }[];
   weeklyTop3MemberCount: number;
   weeklyPicksSubmitted: number;
+  trafficWindowDays: number;
+  dailyVisitors: { date: string; visitors: number }[];
+  totalVisitors: number;
+  totalHoursOnSite: number;
+  avgMinutesPerVisitor: number;
+  pageTraffic: { path: string; views: number }[];
 };
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -43,12 +49,41 @@ export function AdminAnalytics({ data }: { data: AdminAnalyticsData }) {
         <div>
           <h1 className="font-display text-2xl sm:text-3xl tracking-wide">ANALYTICS</h1>
           <p className="text-sm text-[#6B7280] mt-1">
-            Derived from account, league, and pick activity — there&apos;s no page-view tracking wired up yet, so
-            &quot;days with the most traffic&quot; here means signups, league creations, and joins by day of week.
+            Account and league activity is lifetime; site traffic below covers the trailing {data.trafficWindowDays}{" "}
+            days and excludes anything done while signed in as an admin.
           </p>
         </div>
       </div>
 
+      <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2">
+        SITE TRAFFIC — LAST {data.trafficWindowDays} DAYS
+      </div>
+      <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+        <StatTile label="Visitors" value={String(data.totalVisitors)} />
+        <StatTile label="Total hours on site" value={data.totalHoursOnSite.toFixed(1)} />
+        <StatTile label="Avg minutes per visitor" value={data.avgMinutesPerVisitor.toFixed(1)} />
+      </div>
+
+      <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: "1.6fr 1fr" }}>
+        <DailyVisitorsChart data={data.dailyVisitors} />
+        <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-3">TRAFFIC BY PAGE</div>
+          {data.pageTraffic.length === 0 ? (
+            <p className="text-sm text-[#8A909B]">No page views recorded yet.</p>
+          ) : (
+            <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-1">
+              {data.pageTraffic.map((p) => (
+                <div key={p.path} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-[#16181D] truncate">{p.path}</span>
+                  <span className="font-semibold text-[#5B6270] flex-none">{p.views}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2">ACCOUNT ACTIVITY — LIFETIME</div>
       <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         <StatTile label="Total users" value={String(data.totalUsers)} />
         <StatTile
@@ -168,6 +203,34 @@ function StatRow({ label, value, tone }: { label: string; value: number; tone?: 
     <div className="flex items-center justify-between gap-3 text-sm">
       <span className="text-[#5B6270]">{label}</span>
       <span className={`font-semibold ${color}`}>{value}</span>
+    </div>
+  );
+}
+
+function DailyVisitorsChart({ data }: { data: { date: string; visitors: number }[] }) {
+  const max = Math.max(1, ...data.map((d) => d.visitors));
+  const fmt = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+  return (
+    <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
+      <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-3">
+        DAILY VISITORS — LINE UP AGAINST YOUR POST DATES
+      </div>
+      <div className="flex items-end gap-[3px] h-28">
+        {data.map((d) => (
+          <div
+            key={d.date}
+            title={`${fmt(d.date)}: ${d.visitors} visitor${d.visitors === 1 ? "" : "s"}`}
+            className="flex-1 rounded-t bg-purple hover:bg-pink transition"
+            style={{ height: `${(d.visitors / max) * 100}%`, minHeight: d.visitors > 0 ? "2px" : "1px" }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-xs text-[#8A909B] mt-2">
+        <span>{data[0] ? fmt(data[0].date) : ""}</span>
+        <span>{data.length > 0 ? fmt(data[data.length - 1].date) : ""}</span>
+      </div>
     </div>
   );
 }

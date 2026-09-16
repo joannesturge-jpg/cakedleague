@@ -6,6 +6,9 @@ import { AdminLogin } from "./AdminLogin";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { AdminShell } from "./AdminShell";
 import type { AdminAnalyticsData } from "./AdminAnalytics";
+import { computeDailyVisitors, computeSessionStats, computePageTraffic } from "@/lib/analytics";
+
+const TRAFFIC_WINDOW_DAYS = 30;
 
 // [Sun, Mon, Tue, Wed, Thu, Fri, Sat] counts.
 function byWeekday(dates: Date[]) {
@@ -60,6 +63,7 @@ export async function AdminDashboard() {
     memberJoins,
     weeklyTop3MemberCount,
     weeklyPicksSubmitted,
+    pageViews,
   ] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
@@ -111,6 +115,10 @@ export async function AdminDashboard() {
     prisma.leagueMemberWeeklyPick.count({
       where: { member: { league: { deletedAt: null, template: { pickFormat: "WEEKLY_TOP3" } } } },
     }),
+    prisma.pageView.findMany({
+      where: { createdAt: { gte: new Date(Date.now() - TRAFFIC_WINDOW_DAYS * 24 * 60 * 60 * 1000) } },
+      select: { visitorId: true, path: true, createdAt: true },
+    }),
   ]);
 
   const publicLeagueByTemplate: Record<string, string> = {};
@@ -139,6 +147,10 @@ export async function AdminDashboard() {
   const leagueCreatedAts = allLeagues.map((l) => l.createdAt);
   const memberJoinedAts = memberJoins.map((m) => m.joinedAt);
 
+  const dailyVisitors = computeDailyVisitors(pageViews, TRAFFIC_WINDOW_DAYS);
+  const sessionStats = computeSessionStats(pageViews);
+  const pageTraffic = computePageTraffic(pageViews);
+
   const analytics: AdminAnalyticsData = {
     totalUsers: users.length,
     usersWhoCreatedLeague,
@@ -163,6 +175,12 @@ export async function AdminDashboard() {
     topTemplates,
     weeklyTop3MemberCount,
     weeklyPicksSubmitted,
+    trafficWindowDays: TRAFFIC_WINDOW_DAYS,
+    dailyVisitors,
+    totalVisitors: sessionStats.uniqueVisitors,
+    totalHoursOnSite: sessionStats.totalHours,
+    avgMinutesPerVisitor: sessionStats.avgMinutesPerVisitor,
+    pageTraffic,
   };
 
   return (
