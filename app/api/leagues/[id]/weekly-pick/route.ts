@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isWeekOpen, weekOpenInstant, formatOpenDate } from "@/lib/leagues";
 
 // Weekly ranked top-three prediction (+ optional song prediction) for
 // WEEKLY_TOP3 leagues. Upserts — a member can resubmit for the same week
@@ -31,6 +32,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     where: { leagueId_userId: { leagueId: league.id, userId: user.id } },
   });
   if (!membership) return NextResponse.json({ error: "Not a member of this league" }, { status: 403 });
+
+  if (!isWeekOpen(week, league.templateId, league.dueDay, league.dueTime, league.timezone, league.startDate)) {
+    const openAt = weekOpenInstant(week, league.templateId, league.dueDay, league.dueTime, league.timezone, league.startDate);
+    const when = openAt ? formatOpenDate(openAt, league.timezone) : "soon";
+    return NextResponse.json({ error: `Picks for week ${week} aren't open yet — they open ${when}` }, { status: 400 });
+  }
 
   const pool = league.template?.contestants ?? [];
   const eliminated = league.template?.eliminatedContestants ?? [];

@@ -5,7 +5,10 @@ import {
   DRAFT_MODE_LABELS,
   formatDueDate,
   formatNextDueDate,
+  formatOpenDate,
   isSeasonPredictionsLocked,
+  isWeekOpen,
+  weekOpenInstant,
   DUE_DAYS,
   DUE_DAY_LABELS,
   TIMEZONES,
@@ -14,6 +17,7 @@ import {
 } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
+import { scoreDwtsMember } from "@/lib/dwts-scoring";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type WeeklyPick = { id: string; week: number; topThree: string[]; songPrediction: string | null };
@@ -45,6 +49,9 @@ type Template = {
   draftOpenTime: string | null;
   pickFormat: string;
   weekThemes: unknown;
+  actualWinner: string | null;
+  actualFinalFour: string[];
+  weeklyScores: { week: number; contestant: string; score: number }[];
 } | null;
 type League = {
   id: string;
@@ -543,6 +550,10 @@ export function LeaguePageClient({
               <WeeklyPicksForm
                 template={league.template}
                 weeks={league.weeks ?? 11}
+                dueDay={league.dueDay}
+                dueTime={league.dueTime}
+                timezone={league.timezone}
+                startDate={league.startDate}
                 winnerPick={winnerPick}
                 winnerBusy={winnerBusy}
                 winnerError={winnerError}
@@ -585,7 +596,12 @@ export function LeaguePageClient({
         <SubmissionsTab members={league.members} weeks={league.weeks ?? 11} myMembershipId={myMembership?.id ?? null} />
       )}
 
-      {tab === "rankings" && <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />}
+      {tab === "rankings" &&
+        (league.template?.pickFormat === "WEEKLY_TOP3" ? (
+          <DwtsLeaderboard league={league} />
+        ) : (
+          <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />
+        ))}
       {tab === "scoring" && (
         <ComingSoon title="ENTER RESULTS" text="Score entry for commissioners is coming soon." badge="ADMIN" />
       )}
@@ -717,6 +733,10 @@ function DraftPool({
 function WeeklyPicksForm({
   template,
   weeks,
+  dueDay,
+  dueTime,
+  timezone,
+  startDate,
   winnerPick,
   winnerBusy,
   winnerError,
@@ -732,6 +752,10 @@ function WeeklyPicksForm({
 }: {
   template: Template;
   weeks: number;
+  dueDay: string;
+  dueTime: string;
+  timezone: string;
+  startDate: string | Date | null;
   winnerPick: string | null;
   winnerBusy: boolean;
   winnerError: string;
@@ -820,7 +844,10 @@ function WeeklyPicksForm({
   if (!template) return null;
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
   const existing = weeklyPicks.find((p) => p.week === selectedWeek);
-  const canSave = draftTop.every((c) => c) && new Set(draftTop).size === 3;
+  const startDateObj = startDate ? new Date(startDate) : null;
+  const weekOpen = isWeekOpen(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
+  const weekOpensAt = weekOpen ? null : weekOpenInstant(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
+  const canSave = weekOpen && draftTop.every((c) => c) && new Set(draftTop).size === 3;
 
   return (
     <div className="flex flex-col gap-3">
@@ -956,7 +983,7 @@ function WeeklyPicksForm({
               ))}
             </select>
           </div>
-          {weeklyEditing ? (
+          {weeklyEditing && weekOpen ? (
             <button
               onClick={() => setShowContestants(true)}
               className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
@@ -997,6 +1024,11 @@ function WeeklyPicksForm({
               <p className="text-xs text-cream/50">Song: {existing.songPrediction}</p>
             )}
           </>
+        ) : !weekOpen ? (
+          <p className="text-sm text-cream/50 mt-3">
+            Picks for week {selectedWeek} aren&apos;t open yet.
+            {weekOpensAt && <> They open {formatOpenDate(weekOpensAt, timezone)} {TIMEZONE_ABBR[timezone] ?? ""}.</>}
+          </p>
         ) : (
           <>
             <p className="text-sm text-cream/55 mb-4">Rank your top three for this week, in order.</p>
@@ -1347,6 +1379,54 @@ function SubmissionsTab({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function DwtsLeaderboard({ league }: { league: League }) {
+  const template = league.template;
+  if (!template) return null;
+
+  const hasAnyResults =
+    template.weeklyScores.length > 0 || !!template.actualWinner || template.actualFinalFour.length > 0;
+
+  const standings = league.members
+    .map((m) => ({
+      member: m,
+      points: scoreDwtsMember({
+        winnerPick: m.winnerPick,
+        finalFourPicks: m.finalFourPicks,
+        weeklyPicks: m.weeklyPicks,
+        weeklyScores: template.weeklyScores,
+        actualWinner: template.actualWinner,
+        actualFinalFour: template.actualFinalFour,
+        eliminatedContestants: template.eliminatedContestants,
+        rules: league.rules,
+      }),
+    }))
+    .sort((a, b) => b.points - a.points);
+
+  if (!hasAnyResults) {
+    return <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />;
+  }
+
+  return (
+    <div className="bg-card border border-cream/10 rounded-3xl p-2">
+      {standings.map((row, i) => (
+        <div
+          key={row.member.id}
+          className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0"
+          style={{ background: i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
+        >
+          <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
+          <span
+            className="w-7 h-7 rounded-full flex-none"
+            style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+          />
+          <span className="flex-1 text-[14.5px] font-medium truncate">{row.member.user.name}</span>
+          <span className="font-display text-lg text-pink">{row.points}</span>
+        </div>
+      ))}
     </div>
   );
 }

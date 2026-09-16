@@ -158,6 +158,102 @@ export function formatNextDueDate(
   return `${weekday}, ${month} ${date.getUTCDate()} at ${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+// Real UTC instant for a wall-clock time in a given IANA zone — needed to
+// compare "picks open at" against the current moment, not just a calendar
+// date. Converges in one pass for the zones this app supports (no
+// half-hour-offset or DST-transition edge cases to worry about here).
+function zonedInstant(year: number, month: number, day: number, hour: number, minute: number, timezone: string) {
+  const guess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const got = zonedParts(guess, timezone);
+  const wantedUTC = Date.UTC(year, month - 1, day, hour, minute);
+  const gotAsUTC = Date.UTC(got.year, got.month - 1, got.day, got.hour, got.minute);
+  return new Date(guess.getTime() + (wantedUTC - gotAsUTC));
+}
+
+const WEEKDAY_NAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+
+function dayAfter(day: string) {
+  const idx = WEEKDAY_INDEX[day];
+  return idx === undefined ? day : WEEKDAY_NAMES[(idx + 1) % 7];
+}
+
+// The calendar date (UTC-midnight representation, no time-of-day) that
+// week N's picks are due, anchored to the league's startDate. Week 1 is
+// whatever due day/time falls on or after startDate; each week after that
+// is exactly 7 days later.
+function weekDueCalendarDate(week: number, dueDay: string, dueTime: string, timezone: string, startDate: Date | null) {
+  if (!startDate) return null;
+  const anchor = nextDueDate(dueDay, dueTime, timezone, startDate, startDate);
+  if (!anchor) return null;
+  const result = new Date(anchor);
+  result.setUTCDate(result.getUTCDate() + (week - 1) * 7);
+  return result;
+}
+
+// One-time schedule exceptions where a specific week's picks open later
+// than the usual "day after due day" default — e.g. a multi-night
+// premiere means results aren't final in time for the normal open day.
+// Keyed by template id, then week number.
+const PICK_OPEN_EXCEPTIONS: Record<string, Record<number, { day: string; time: string }>> = {
+  tpl_dwts: { 2: { day: "THURSDAY", time: "00:00" } },
+};
+
+// The real instant week N's picks open — the day after the previous
+// week's due day, at midnight in the league's zone, unless overridden
+// above. Week 1 (and leagues with no startDate to anchor against) are
+// always open — there's no "previous week" to wait on.
+export function weekOpenInstant(
+  week: number,
+  templateId: string | null | undefined,
+  dueDay: string,
+  dueTime: string,
+  timezone: string,
+  startDate: Date | null
+): Date | null {
+  if (week <= 1 || !startDate) return null;
+  const prevDue = weekDueCalendarDate(week - 1, dueDay, dueTime, timezone, startDate);
+  if (!prevDue) return null;
+
+  const override = templateId ? PICK_OPEN_EXCEPTIONS[templateId]?.[week] : undefined;
+  const openDay = override?.day ?? dayAfter(dueDay);
+  const openTime = override?.time ?? "00:00";
+
+  const targetIdx = WEEKDAY_INDEX[openDay];
+  let diff = (targetIdx - prevDue.getUTCDay() + 7) % 7;
+  if (diff === 0) diff = 7;
+  const openCalendar = new Date(prevDue);
+  openCalendar.setUTCDate(prevDue.getUTCDate() + diff);
+
+  const [h, m] = openTime.split(":").map(Number);
+  return zonedInstant(openCalendar.getUTCFullYear(), openCalendar.getUTCMonth() + 1, openCalendar.getUTCDate(), h, m, timezone);
+}
+
+export function isWeekOpen(
+  week: number,
+  templateId: string | null | undefined,
+  dueDay: string,
+  dueTime: string,
+  timezone: string,
+  startDate: Date | null,
+  now: Date = new Date()
+): boolean {
+  const openAt = weekOpenInstant(week, templateId, dueDay, dueTime, timezone, startDate);
+  if (!openAt) return true;
+  return now.getTime() >= openAt.getTime();
+}
+
+// Formats an arbitrary instant (like a picks-open time) as a concrete date
+// in the given zone — same style as formatNextDueDate.
+export function formatOpenDate(instant: Date, timezone: string) {
+  const parts = zonedParts(instant, timezone);
+  const cal = calendarDate(parts.year, parts.month, parts.day);
+  const weekday = cal.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+  const month = cal.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const period = parts.hour >= 12 ? "PM" : "AM";
+  const hour12 = parts.hour % 12 === 0 ? 12 : parts.hour % 12;
+  return `${weekday}, ${month} ${cal.getUTCDate()} at ${hour12}:${String(parts.minute).padStart(2, "0")} ${period}`;
+}
+
 export function formatMoney(cents: number) {
   return `$${cents.toLocaleString()}`;
 }
