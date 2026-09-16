@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { AdminUsers, type AdminUserRow } from "./AdminUsers";
 import { AdminTemplates, type AdminTemplateRow } from "./AdminTemplates";
@@ -7,8 +8,21 @@ import { AdminMarketing, type NotifySignupRow } from "./AdminMarketing";
 import { AdminLeagues, type AdminLeagueRow } from "./AdminLeagues";
 import { AdminScoring } from "./AdminScoring";
 import { AdminAnalytics, type AdminAnalyticsData } from "./AdminAnalytics";
+import type { AdminTab } from "./AdminDashboard";
+
+// "users" is the default tab and lives at the bare admin root rather than
+// /users, so refreshing admin.<domain> still lands on it.
+const TAB_PATHS: Record<AdminTab, string> = {
+  users: "/",
+  templates: "/templates",
+  scoring: "/scoring",
+  leagues: "/leagues",
+  marketing: "/marketing",
+  analytics: "/analytics",
+};
 
 export function AdminShell({
+  initialTab,
   adminEmail,
   users,
   templates,
@@ -17,6 +31,7 @@ export function AdminShell({
   leagues,
   analytics,
 }: {
+  initialTab: AdminTab;
   adminEmail: string;
   users: AdminUserRow[];
   templates: AdminTemplateRow[];
@@ -25,7 +40,13 @@ export function AdminShell({
   leagues: AdminLeagueRow[];
   analytics: AdminAnalyticsData;
 }) {
-  const [tab, setTab] = useState<"users" | "templates" | "scoring" | "leagues" | "marketing" | "analytics">("users");
+  const router = useRouter();
+  const [tab, setTabState] = useState<AdminTab>(initialTab);
+
+  function setTab(next: AdminTab) {
+    setTabState(next);
+    router.replace(TAB_PATHS[next], { scroll: false });
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-[#16181D] font-sans">

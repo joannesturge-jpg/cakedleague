@@ -24,7 +24,9 @@ function inLastNDays(dates: Date[], n: number, offsetDays = 0) {
   return dates.filter((d) => d.getTime() > start && d.getTime() <= end).length;
 }
 
-export async function AdminDashboard() {
+export type AdminTab = "users" | "templates" | "scoring" | "leagues" | "marketing" | "analytics";
+
+export async function AdminDashboard({ initialTab = "users" }: { initialTab?: AdminTab } = {}) {
   // The admin dashboard is only reachable at admin.<domain> — never on the
   // main site, even if someone guesses the path. Local dev is exempt so you
   // don't need a real subdomain to work on it.
@@ -185,6 +187,7 @@ export async function AdminDashboard() {
 
   return (
     <AdminShell
+      initialTab={initialTab}
       adminEmail={user.email}
       users={users}
       templates={templates}

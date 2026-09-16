@@ -1,10 +1,20 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { NotifyForm } from "./NotifyForm";
 import { getCurrentUser } from "@/lib/auth";
 import { JoinPublicLeagueButton } from "./JoinPublicLeagueButton";
+import { AdminDashboard } from "@/app/admin/AdminDashboard";
 
 export default async function PublicLeaguesPage() {
+  // /leagues is also the Leagues tab's URL in the admin panel — same path,
+  // different content depending on which host it's requested on (same
+  // pattern the root page uses for admin. vs the main site).
+  const host = headers().get("host") || "";
+  if (host.startsWith("admin.")) {
+    return <AdminDashboard initialTab="leagues" />;
+  }
+
   const user = await getCurrentUser();
 
   const [publicLeagues, shows] = await Promise.all([
