@@ -35,6 +35,9 @@ export function MobileNav({ isLoggedIn }: { isLoggedIn: boolean }) {
             <Link href="/" onClick={close} className="px-2 py-3.5 text-base font-semibold text-cream/85 border-b border-cream/10">
               Home
             </Link>
+            <Link href="/how-it-works" onClick={close} className="px-2 py-3.5 text-base font-semibold text-cream/85 border-b border-cream/10">
+              How It Works
+            </Link>
             <Link href="/leagues" onClick={close} className="px-2 py-3.5 text-base font-semibold text-cream/85 border-b border-cream/10">
               Public Leagues
             </Link>

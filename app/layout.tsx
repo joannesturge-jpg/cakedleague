@@ -45,6 +45,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               Home
             </Link>
             <Link
+              href="/how-it-works"
+              className="px-3.5 py-2 rounded-full text-sm font-semibold text-cream/55 hover:text-cream transition whitespace-nowrap"
+            >
+              How It Works
+            </Link>
+            <Link
               href="/leagues"
               className="px-3.5 py-2 rounded-full text-sm font-semibold text-cream/55 hover:text-cream transition whitespace-nowrap"
             >
