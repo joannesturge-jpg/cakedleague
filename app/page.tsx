@@ -43,9 +43,9 @@ export default async function HomePage() {
           style={{ background: "radial-gradient(circle, rgba(232,91,174,.3), transparent 68%)" }}
         />
 
-        <div className="relative max-w-6xl mx-auto grid gap-10 lg:gap-16 items-center" style={{ gridTemplateColumns: "1.05fr 0.95fr" }}>
-          <div>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple/20 border border-purple/50 text-[12.5px] font-semibold text-lilac mb-6">
+        <div className="relative max-w-6xl mx-auto grid gap-10 lg:gap-16 items-center grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple/20 border border-purple/50 text-[12.5px] font-semibold text-lilac mb-6 mx-auto lg:mx-0">
               <span className="w-1.5 h-1.5 rounded-full bg-pink inline-block" />
               First leagues opening this season
             </div>
@@ -57,12 +57,12 @@ export default async function HomePage() {
             </h1>
             <p className="font-script text-3xl sm:text-5xl text-pink mt-2 mb-6 leading-none">even the niche stuff</p>
 
-            <p className="text-lg text-cream/70 max-w-lg mb-8 leading-relaxed">
+            <p className="text-lg text-cream/70 max-w-lg mb-8 leading-relaxed mx-auto lg:mx-0">
               Bake Off. Dancing with the Stars. Survivor. Your cousin&apos;s bowling league. If nobody built the app
               for it, build the league yourself. Your show, your rules, your points.
             </p>
 
-            <div className="flex gap-3 flex-wrap">
+            <div className="flex gap-3 flex-wrap justify-center lg:justify-start">
               <Link
                 href={user ? "/dashboard" : "/signup"}
                 className="px-8 py-4 rounded-full bg-purple text-cream font-bold text-base hover:bg-[#8f47ff] transition shadow-[0_12px_34px_rgba(123,44,245,.42)]"
@@ -78,7 +78,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="relative" style={{ animation: "cwfloat 7s ease-in-out infinite" }}>
+          <div className="relative hidden lg:block" style={{ animation: "cwfloat 7s ease-in-out infinite" }}>
             <div className="bg-card border border-cream/12 rounded-3xl p-5 shadow-[0_34px_74px_rgba(0,0,0,.48)]">
               <div className="flex items-start justify-between mb-[18px]">
                 <div>
