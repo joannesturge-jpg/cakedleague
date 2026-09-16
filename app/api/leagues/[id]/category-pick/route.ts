@@ -19,6 +19,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!Number.isFinite(week) || week < 1) {
     return NextResponse.json({ error: "Missing week" }, { status: 400 });
   }
+  if (week === 1) {
+    return NextResponse.json(
+      { error: "Drafting begins week 2, once we've met the contestants" },
+      { status: 400 }
+    );
+  }
   if (!starBakerPick && !technicalPick && !votedOffPick) {
     return NextResponse.json({ error: "Pick at least one category" }, { status: 400 });
   }

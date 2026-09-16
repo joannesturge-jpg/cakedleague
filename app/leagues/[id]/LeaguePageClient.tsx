@@ -1097,7 +1097,7 @@ function CategoryPicksForm({
   categoryError: string;
   onSubmitCategory: (week: number, draft: CategoryDraft) => Promise<boolean>;
 }) {
-  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [selectedWeek, setSelectedWeek] = useState(weeks >= 2 ? 2 : 1);
   const [showContestants, setShowContestants] = useState(false);
 
   const startingPick = categoryPicks.find((p) => p.week === 1);
@@ -1178,7 +1178,7 @@ function CategoryPicksForm({
               Picks open {formatNextDueDate(template.draftOpenDay, template.draftOpenTime, DEFAULT_TIMEZONE)} PT
             </span>
           )}
-          {editing ? (
+          {selectedWeek === 1 ? null : editing ? (
             categoryCast && (
               <button
                 onClick={() => setShowContestants(true)}
@@ -1199,9 +1199,6 @@ function CategoryPicksForm({
           )}
         </div>
       </div>
-      {selectedWeek === 1 && (
-        <p className="text-xs text-cream/40 mt-1 mb-1">Week 1 picks aren&apos;t scored — just for fun.</p>
-      )}
       {categoryCast && showContestants && (
         <CategoryPicksModal
           cast={categoryCast.cast}
@@ -1212,7 +1209,9 @@ function CategoryPicksForm({
           onClose={() => setShowContestants(false)}
         />
       )}
-      {!editing && existing ? (
+      {selectedWeek === 1 ? (
+        <p className="text-sm text-cream/50 mt-3">Drafting will begin week 2, once we have met the contestants.</p>
+      ) : !editing && existing ? (
         <div className="mt-3 flex flex-col gap-1">
           <p className="text-sm text-cream/78">
             Star Baker: <span className="font-semibold text-pink">{existing.starBakerPick || "—"}</span>

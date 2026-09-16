@@ -17,18 +17,30 @@ function statusOf(l: AdminLeagueRow): Exclude<StatusFilter, "All"> {
   return l.isActive ? "Active" : "Inactive";
 }
 
+const UNTAGGED = "Untagged";
+
 export function AdminLeagues({ leagues }: { leagues: AdminLeagueRow[] }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [tagFilter, setTagFilter] = useState<string>("All");
+
+  const tags = useMemo(() => {
+    const set = new Set(leagues.map((l) => l.tag).filter((t): t is string => !!t));
+    const hasUntagged = leagues.some((l) => !l.tag);
+    return [...Array.from(set).sort(), ...(hasUntagged ? [UNTAGGED] : [])];
+  }, [leagues]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leagues.filter((l) => {
       if (q && !l.name.toLowerCase().includes(q) && !(l.tag ?? "").toLowerCase().includes(q)) return false;
       if (statusFilter !== "All" && statusOf(l) !== statusFilter) return false;
+      if (tagFilter !== "All") {
+        if (tagFilter === UNTAGGED ? !!l.tag : l.tag !== tagFilter) return false;
+      }
       return true;
     });
-  }, [leagues, query, statusFilter]);
+  }, [leagues, query, statusFilter, tagFilter]);
 
   return (
     <div>
@@ -61,6 +73,29 @@ export function AdminLeagues({ leagues }: { leagues: AdminLeagueRow[] }) {
             </button>
           ))}
         </div>
+        {tags.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap items-center pl-2.5 border-l border-[#E2E4E9]">
+            <button
+              onClick={() => setTagFilter("All")}
+              className={`px-3 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                tagFilter === "All" ? "bg-[#F1E9FE] border-purple text-[#5B1FBF]" : "bg-white border-[#D6D9E0] text-[#5B6270]"
+              }`}
+            >
+              All tags
+            </button>
+            {tags.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTagFilter(t)}
+                className={`px-3 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                  tagFilter === t ? "bg-[#F1E9FE] border-purple text-[#5B1FBF]" : "bg-white border-[#D6D9E0] text-[#5B6270]"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white border border-[#E2E4E9] rounded-b-lg overflow-x-auto">
