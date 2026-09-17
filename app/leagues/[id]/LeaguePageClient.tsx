@@ -98,10 +98,12 @@ export function LeaguePageClient({
   league,
   isOwner,
   currentUserId,
+  isAdminPreview,
 }: {
   league: League;
   isOwner: boolean;
   currentUserId: string;
+  isAdminPreview: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"details" | "submissions" | "rankings" | "scoring">("details");
@@ -607,6 +609,7 @@ export function LeaguePageClient({
           weeks={league.weeks ?? 11}
           myMembershipId={myMembership?.id ?? null}
           isOwner={isOwner}
+          isAdminPreview={isAdminPreview}
           pickFormat={league.template?.pickFormat ?? null}
         />
       )}
@@ -1289,6 +1292,7 @@ function SubmissionsTab({
   weeks,
   myMembershipId,
   isOwner,
+  isAdminPreview,
   pickFormat,
 }: {
   leagueId: string;
@@ -1296,6 +1300,7 @@ function SubmissionsTab({
   weeks: number;
   myMembershipId: string | null;
   isOwner: boolean;
+  isAdminPreview: boolean;
   pickFormat: string | null;
 }) {
   const router = useRouter();
@@ -1304,8 +1309,11 @@ function SubmissionsTab({
   const [songBusyKey, setSongBusyKey] = useState<string | null>(null);
   const me = members.find((m) => m.id === myMembershipId);
   const myPick = me?.weeklyPicks.find((p) => p.week === week);
-  const unlocked = !!myPick;
-  const seasonPredictionsUnlocked = !!me?.winnerPick && me.finalFourPicks.length === 4;
+  // Normally you have to submit your own picks to see everyone else's —
+  // an admin previewing a league they're not a member of has nothing to
+  // submit, so that gate would otherwise make the preview useless.
+  const unlocked = !!myPick || isAdminPreview;
+  const seasonPredictionsUnlocked = (!!me?.winnerPick && me.finalFourPicks.length === 4) || isAdminPreview;
   const seasonSubmittedCount = members.filter((m) => m.winnerPick && m.finalFourPicks.length === 4).length;
 
   async function toggleSongCorrect(memberId: string, correct: boolean) {

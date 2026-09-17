@@ -41,5 +41,12 @@ export default async function LeaguePage({ params }: { params: { id: string } })
     );
   }
 
-  return <LeaguePageClient league={league} isOwner={isOwner} currentUserId={user.id} />;
+  return (
+    <LeaguePageClient
+      league={league}
+      isOwner={isOwner}
+      currentUserId={user.id}
+      isAdminPreview={!isMember && !isOwner && user.isAdmin}
+    />
+  );
 }
