@@ -373,13 +373,19 @@ function WeeklyTop3Scoring({
   const scoresThisWeek = template.weeklyScores.filter((s) => s.week === week);
   const scoreOf = (c: string) => scoresThisWeek.find((s) => s.contestant === c)?.score ?? 0;
 
+  // Scoring stays open to every couple, eliminated or not — a couple can
+  // still land in a week's top three (or get injured, etc.) the same week
+  // they're voted off, so pulling them from the grid the moment they're
+  // marked eliminated would make that unrecordable.
+  const allContestants = template.contestants;
+
   const otherRules = template.rules.filter((r) => !RANK_DERIVED_PATTERN.test(r.label));
 
   // Nothing here saves as it's typed/clicked — it's all held in a local
   // draft, seeded from the committed data, until "Submit Week N" is
   // pressed. Re-seeded whenever the selected template or week changes.
   function seedScores() {
-    return Object.fromEntries(activeContestants.map((c) => [c, String(scoreOf(c))]));
+    return Object.fromEntries(allContestants.map((c) => [c, String(scoreOf(c))]));
   }
   function seedAwards() {
     const s = new Set<string>();
@@ -416,11 +422,11 @@ function WeeklyTop3Scoring({
     });
   }
 
-  const ranked = [...activeContestants].sort((a, b) => draftScoreOf(b) - draftScoreOf(a));
+  const ranked = [...allContestants].sort((a, b) => draftScoreOf(b) - draftScoreOf(a));
   const thirdPlaceScore = ranked.length >= 3 ? draftScoreOf(ranked[2]) : -Infinity;
   const topThree = new Set(ranked.filter((c) => draftScoreOf(c) >= thirdPlaceScore && draftScoreOf(c) > 0));
 
-  const scoreChanges = activeContestants
+  const scoreChanges = allContestants
     .filter((c) => draftScoreOf(c) !== scoreOf(c))
     .map((c) => ({ contestant: c, score: draftScoreOf(c) }));
   const awardChanges = otherRules.flatMap((rule) =>
@@ -444,8 +450,9 @@ function WeeklyTop3Scoring({
           Enter each couple&apos;s score for the week — the top three (ties included) are ranked automatically below.
         </p>
         <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-          {activeContestants.map((c) => {
+          {allContestants.map((c) => {
             const inTop3 = topThree.has(c);
+            const eliminated = template.eliminatedContestants.includes(c);
             return (
               <div
                 key={c}
@@ -454,6 +461,7 @@ function WeeklyTop3Scoring({
                 }`}
               >
                 <span className="flex-1 text-sm truncate">{c}</span>
+                {eliminated && <span className="text-[10px] font-bold text-[#C2314E]">OUT</span>}
                 {inTop3 && <span className="text-[10px] font-bold text-[#1E7B45]">TOP 3</span>}
                 <input
                   type="number"
@@ -464,8 +472,8 @@ function WeeklyTop3Scoring({
               </div>
             );
           })}
-          {activeContestants.length === 0 && (
-            <p className="text-xs text-[#8A909B]">No active contestants — add some in League Templates.</p>
+          {allContestants.length === 0 && (
+            <p className="text-xs text-[#8A909B]">No contestants — add some in League Templates.</p>
           )}
         </div>
       </div>
