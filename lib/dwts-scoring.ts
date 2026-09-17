@@ -35,15 +35,43 @@ export function actualTopThree(scoresThisWeek: DwtsWeeklyScoreEntry[]): Set<stri
   return new Set(ranked.filter((s) => s.score > 0 && s.score >= thirdScore).map((s) => s.contestant));
 }
 
-// A clean, tie-free 1st/2nd/3rd ranking — "exact order" only makes sense
-// when there is one.
-function strictTopThree(scoresThisWeek: DwtsWeeklyScoreEntry[]): string[] | null {
+// The top three's couples grouped by tied score, in descending order —
+// e.g. two couples tied at 21 points share the first group (positions
+// 1-2), a couple at 20 alone forms the next (position 3). A tie means
+// either order within that group counts for the exact-order bonus, so
+// this only pins down which *group* each position belongs to, not one
+// canonical ranking. Returns null when a tie straddles the position-3
+// cutoff (e.g. three couples tied for what would be positions 2-3-4) —
+// there's no clean boundary to award the bonus against.
+function topThreePositionGroups(scoresThisWeek: DwtsWeeklyScoreEntry[]): string[][] | null {
   const ranked = [...scoresThisWeek].filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
-  if (ranked.length < 3) return null;
-  const [a, b, c, d] = ranked;
-  if (a.score === b.score || b.score === c.score) return null;
-  if (d && d.score === c.score) return null;
-  return [a.contestant, b.contestant, c.contestant];
+  const groups: string[][] = [];
+  let total = 0;
+  let i = 0;
+  while (i < ranked.length && total < 3) {
+    const score = ranked[i].score;
+    const group: string[] = [];
+    while (i < ranked.length && ranked[i].score === score) {
+      group.push(ranked[i].contestant);
+      i++;
+    }
+    if (group.length > 3 - total) return null;
+    groups.push(group);
+    total += group.length;
+  }
+  return total === 3 ? groups : null;
+}
+
+// A pick matches if each position group's couples land somewhere within
+// that group's block of positions, in any order within the block.
+function matchesPositionGroups(pick: string[], groups: string[][]): boolean {
+  let idx = 0;
+  for (const group of groups) {
+    const slice = pick.slice(idx, idx + group.length);
+    if (slice.length !== group.length || !group.every((name) => slice.includes(name))) return false;
+    idx += group.length;
+  }
+  return true;
 }
 
 export function scoreWeeklyTopThree(
@@ -60,8 +88,8 @@ export function scoreWeeklyTopThree(
   const correct = pick.topThree.filter((c) => c && top3.has(c)).length;
   let points = correct * correctPoints;
 
-  const strict = strictTopThree(scoresThisWeek);
-  if (strict && pick.topThree[0] === strict[0] && pick.topThree[1] === strict[1] && pick.topThree[2] === strict[2]) {
+  const groups = topThreePositionGroups(scoresThisWeek);
+  if (groups && matchesPositionGroups(pick.topThree, groups)) {
     points += exactOrderPoints;
   }
 
