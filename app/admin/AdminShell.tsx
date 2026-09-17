@@ -8,6 +8,7 @@ import { AdminMarketing, type NotifySignupRow } from "./AdminMarketing";
 import { AdminLeagues, type AdminLeagueRow } from "./AdminLeagues";
 import { AdminScoring } from "./AdminScoring";
 import { AdminAnalytics, type AdminAnalyticsData } from "./AdminAnalytics";
+import { AdminSuppressedEmails, type SuppressedEmailRow } from "./AdminSuppressedEmails";
 import type { AdminTab } from "./AdminDashboard";
 
 // "users" is the default tab and lives at the bare admin root rather than
@@ -19,6 +20,7 @@ const TAB_PATHS: Record<AdminTab, string> = {
   leagues: "/leagues",
   marketing: "/marketing",
   analytics: "/analytics",
+  unsubscribed: "/unsubscribed",
 };
 
 export function AdminShell({
@@ -30,6 +32,7 @@ export function AdminShell({
   publicLeagueByTemplate,
   leagues,
   analytics,
+  suppressedEmails,
 }: {
   initialTab: AdminTab;
   adminEmail: string;
@@ -39,6 +42,7 @@ export function AdminShell({
   publicLeagueByTemplate: Record<string, string>;
   leagues: AdminLeagueRow[];
   analytics: AdminAnalyticsData;
+  suppressedEmails: SuppressedEmailRow[];
 }) {
   const router = useRouter();
   const [tab, setTabState] = useState<AdminTab>(initialTab);
@@ -81,6 +85,9 @@ export function AdminShell({
         <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")}>
           Analytics
         </TabButton>
+        <TabButton active={tab === "unsubscribed"} onClick={() => setTab("unsubscribed")}>
+          Unsubscribed
+        </TabButton>
       </div>
 
       <div className="px-4 sm:px-8 py-6 pb-16">
@@ -92,6 +99,7 @@ export function AdminShell({
         {tab === "leagues" && <AdminLeagues leagues={leagues} templateNameById={templateNameById} />}
         {tab === "marketing" && <AdminMarketing signups={notifySignups} />}
         {tab === "analytics" && <AdminAnalytics data={analytics} />}
+        {tab === "unsubscribed" && <AdminSuppressedEmails emails={suppressedEmails} />}
       </div>
     </div>
   );

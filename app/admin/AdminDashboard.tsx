@@ -24,7 +24,7 @@ function inLastNDays(dates: Date[], n: number, offsetDays = 0) {
   return dates.filter((d) => d.getTime() > start && d.getTime() <= end).length;
 }
 
-export type AdminTab = "users" | "templates" | "scoring" | "leagues" | "marketing" | "analytics";
+export type AdminTab = "users" | "templates" | "scoring" | "leagues" | "marketing" | "analytics" | "unsubscribed";
 
 export async function AdminDashboard({ initialTab = "users" }: { initialTab?: AdminTab } = {}) {
   // The admin dashboard is only reachable at admin.<domain> — never on the
@@ -59,6 +59,7 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
     notifySignups,
     publicLeagues,
     allLeagues,
+    suppressedEmails,
     usersWhoCreatedLeague,
     usersActivated,
     usersWhoJoinedOthers,
@@ -105,6 +106,7 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
         _count: { select: { members: true } },
       },
     }),
+    prisma.suppressedEmail.findMany({ orderBy: { createdAt: "desc" } }),
     // Activation funnel — every league owner is also auto-added as a member
     // of their own league, so "created" is always a subset of "has a
     // membership." usersWhoJoinedOthers isolates memberships that aren't
@@ -195,6 +197,7 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
       publicLeagueByTemplate={publicLeagueByTemplate}
       leagues={allLeagues}
       analytics={analytics}
+      suppressedEmails={suppressedEmails}
     />
   );
 }

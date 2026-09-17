@@ -324,6 +324,18 @@ model PageView {
   @@index([createdAt])
 }
 
+// A global "never email this address" list, managed from the admin
+// panel — separate from User.notifyPicksDue/etc (which are per-account
+// preferences a logged-in user sets for themselves). This covers anyone,
+// account or not, and every send in lib/email.ts checks it except
+// password resets (a user actively requesting one still needs it) and
+// admin test sends.
+model SuppressedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   tokenHash String    @unique

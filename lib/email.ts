@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { createUnsubscribeToken } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 const FROM = process.env.EMAIL_FROM ?? "Caked Leagues <onboarding@resend.dev>";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
@@ -16,6 +17,14 @@ async function footerHtml(userId: string) {
   const token = await createUnsubscribeToken(userId);
   const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${token}`;
   return `<div style="margin-top:24px;padding-top:14px;border-top:1px solid #eee;font-size:12px;color:#9aa0aa;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;"><a href="${unsubscribeUrl}" style="color:#9aa0aa;text-decoration:underline;">Unsubscribe</a><span style="color:#c7cad1;"> | </span><a href="${APP_URL}" style="color:#9aa0aa;text-decoration:underline;">Caked Leagues</a><div style="margin-top:6px;font-family:'Brush Script MT','Segoe Script',cursive;font-size:20px;color:#E85BAE;">Stay Caked</div></div>`;
+}
+
+// Checked by every real (non-test) send in this file except password
+// resets — a user actively requesting one still needs it even if
+// they've opted out of everything else.
+export async function isEmailSuppressed(email: string): Promise<boolean> {
+  const row = await prisma.suppressedEmail.findUnique({ where: { email: email.toLowerCase().trim() } });
+  return !!row;
 }
 
 async function send(to: string, subject: string, html: string, context: string) {
@@ -75,6 +84,7 @@ export async function sendFeedbackEmail(text: string, from: { name: string; emai
 }
 
 export async function sendSignupConfirmationEmail(to: string, userId: string) {
+  if (await isEmailSuppressed(to)) return;
   const token = await createUnsubscribeToken(userId);
   const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${token}`;
   await send(
@@ -107,6 +117,7 @@ function signupHtml(unsubscribeUrl: string) {
 }
 
 export async function sendLeagueCreatedEmail(to: string, userId: string) {
+  if (await isEmailSuppressed(to)) return;
   const token = await createUnsubscribeToken(userId);
   const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${token}`;
   await send(to, "You created a league!", leagueCreatedHtml(unsubscribeUrl), "League created confirmation");
@@ -132,6 +143,7 @@ function leagueCreatedHtml(unsubscribeUrl: string) {
 }
 
 export async function sendLeagueJoinedEmail(to: string, userId: string) {
+  if (await isEmailSuppressed(to)) return;
   const token = await createUnsubscribeToken(userId);
   const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${token}`;
   await send(to, "You're in!", leagueJoinedHtml(unsubscribeUrl), "League joined confirmation");
@@ -156,6 +168,7 @@ function leagueJoinedHtml(unsubscribeUrl: string) {
 }
 
 export async function sendPicksDueReminderEmail(to: string, userId: string, dueLabel: string) {
+  if (await isEmailSuppressed(to)) return;
   const safeDueLabel = escapeHtml(dueLabel);
   const token = await createUnsubscribeToken(userId);
   const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${token}`;
