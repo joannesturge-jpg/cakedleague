@@ -272,6 +272,7 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
           onToggleEliminated={toggleEliminated}
           onSaveActualResults={saveActualResults}
           onSubmitWeek={submitWeek}
+          onSaveWeekTheme={saveWeekTheme}
         />
       ) : template.pickFormat === "WEEKLY_CATEGORIES" ? (
         <WeeklyCategoriesScoring
@@ -364,6 +365,7 @@ function WeeklyTop3Scoring({
   onToggleEliminated,
   onSaveActualResults,
   onSubmitWeek,
+  onSaveWeekTheme,
 }: {
   template: AdminScoringTemplate;
   week: number;
@@ -376,9 +378,19 @@ function WeeklyTop3Scoring({
     scoreChanges: { contestant: string; score: number }[],
     awardChanges: { ruleId: string; contestant: string }[]
   ) => void;
+  onSaveWeekTheme: (week: number, theme: string) => void;
 }) {
   const scoresThisWeek = template.weeklyScores.filter((s) => s.week === week);
   const scoreOf = (c: string) => scoresThisWeek.find((s) => s.contestant === c)?.score ?? 0;
+
+  const weekThemes = (template.weekThemes as Record<string, string> | null) ?? {};
+  const savedTheme = weekThemes[String(week)] ?? "";
+  const [themeDraft, setThemeDraft] = useState(savedTheme);
+  const [themeSyncedKey, setThemeSyncedKey] = useState(`${template.id}-${week}`);
+  if (`${template.id}-${week}` !== themeSyncedKey) {
+    setThemeSyncedKey(`${template.id}-${week}`);
+    setThemeDraft(savedTheme);
+  }
 
   // Scoring stays open to every couple, eliminated or not — a couple can
   // still land in a week's top three (or get injured, etc.) the same week
@@ -450,6 +462,25 @@ function WeeklyTop3Scoring({
         busyKey={busyKey}
         onSaveActualResults={onSaveActualResults}
       />
+
+      <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
+        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2">WEEK {week} THEME</div>
+        <div className="flex items-center gap-2">
+          <input
+            value={themeDraft}
+            onChange={(e) => setThemeDraft(e.target.value)}
+            placeholder="e.g. Viral Hits"
+            className="flex-1 px-3 py-2 rounded-md border border-[#D6D9E0] bg-white text-sm outline-none focus:border-purple transition"
+          />
+          <button
+            onClick={() => onSaveWeekTheme(week, themeDraft)}
+            disabled={themeDraft === savedTheme || busyKey === `theme:${week}`}
+            className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+          >
+            {busyKey === `theme:${week}` ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
 
       <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
         <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SCORE EVERY COUPLE</div>

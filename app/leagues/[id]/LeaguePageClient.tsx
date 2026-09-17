@@ -862,6 +862,8 @@ function WeeklyPicksForm({
   if (!template) return null;
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
   const existing = weeklyPicks.find((p) => p.week === selectedWeek);
+  const weekThemes = (template.weekThemes as Record<string, string> | null) ?? {};
+  const weekTheme = (w: number) => weekThemes[String(w)] ?? "";
   const startDateObj = startDate ? new Date(startDate) : null;
   const weekOpen = isWeekOpen(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
   const weekOpensAt = weekOpen ? null : weekOpenInstant(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
@@ -988,7 +990,9 @@ function WeeklyPicksForm({
       <div className="bg-card border border-cream/10 rounded-3xl p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h3 className="font-display text-xl tracking-wide">WEEKLY PICKS</h3>
+            <h3 className="font-display text-xl tracking-wide">
+              WEEKLY PICKS{weekTheme(selectedWeek) && ` — ${weekTheme(selectedWeek).toUpperCase()}`}
+            </h3>
             <select
               value={selectedWeek}
               onChange={(e) => changeWeek(Number(e.target.value))}
@@ -997,6 +1001,7 @@ function WeeklyPicksForm({
               {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
                 <option key={w} value={w}>
                   Week {w}
+                  {weekTheme(w) ? ` — ${weekTheme(w)}` : ""}
                 </option>
               ))}
             </select>
