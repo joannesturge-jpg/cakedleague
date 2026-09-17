@@ -31,11 +31,14 @@ export type AdminScoringTemplate = {
   actualWinner: string | null;
 };
 
-// Rules whose scoring now comes from the ranked-score grid instead of a
-// manual per-rule toggle — matched by keyword since templates don't
-// currently tag rules by role. Adjust if a future template's wording
-// doesn't fit "top three" / "song".
-const RANK_DERIVED_PATTERN = /top three|song/i;
+// Rules that score themselves from other admin inputs instead of a manual
+// per-rule toggle — matched by keyword since templates don't currently tag
+// rules by role. Adjust if a future template's wording doesn't fit these:
+// "top three" / "song" come from the ranked-score grid above, and
+// "winner pick" (both the correct-pick and eliminated-pick rules) comes
+// from Actual Season Winner and the Couple Eliminated toggles — so
+// there's nothing left to manually award for either one.
+const RANK_DERIVED_PATTERN = /top three|song|winner pick/i;
 
 export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] }) {
   const router = useRouter();
