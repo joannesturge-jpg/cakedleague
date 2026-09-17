@@ -96,21 +96,37 @@ function celebrityName(full: string) {
   return idx === -1 ? full : full.slice(0, idx).trim();
 }
 
+type LeagueTab = "details" | "submissions" | "rankings" | "scoring";
+
+const TAB_PATHS: Record<LeagueTab, string> = {
+  details: "",
+  submissions: "/submissions",
+  rankings: "/rankings",
+  scoring: "/scoring",
+};
+
 export function LeaguePageClient({
   league,
   isOwner,
   currentUserId,
   isAdminPreview,
+  initialTab,
 }: {
   league: League;
   isOwner: boolean;
   currentUserId: string;
   isAdminPreview: boolean;
+  initialTab: LeagueTab;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"details" | "submissions" | "rankings" | "scoring">("details");
-  const [rulesOpen, setRulesOpen] = useState(true);
-  const [membersOpen, setMembersOpen] = useState(true);
+  const [tab, setTabState] = useState<LeagueTab>(initialTab);
+
+  function setTab(next: LeagueTab) {
+    setTabState(next);
+    router.replace(`/leagues/${league.id}${TAB_PATHS[next]}`, { scroll: false });
+  }
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy link");
   const [deleting, setDeleting] = useState(false);
 
@@ -789,7 +805,14 @@ function WeeklyPicksForm({
   weeklyError: string;
   onSubmitWeekly: (week: number, topThree: string[], songPrediction: string) => Promise<boolean>;
 }) {
-  const [selectedWeek, setSelectedWeek] = useState(1);
+  // Default to the week after the last one that's been scored — once a
+  // week is done, there's no reason to land on it instead of the current
+  // one, and this keeps advancing on its own as each week gets scored.
+  const [selectedWeek, setSelectedWeek] = useState(() => {
+    const scoredWeeks = template?.weeklyScores.map((s) => s.week) ?? [];
+    const nextWeek = (scoredWeeks.length ? Math.max(...scoredWeeks) : 0) + 1;
+    return Math.min(Math.max(nextWeek, 1), weeks || 1);
+  });
   const [showContestants, setShowContestants] = useState(false);
 
   // Season winner — editable up until the lock date. Starts in edit mode
