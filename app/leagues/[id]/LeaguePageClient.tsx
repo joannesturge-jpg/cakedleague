@@ -17,7 +17,7 @@ import {
 } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
-import { scoreDwtsMember } from "@/lib/dwts-scoring";
+import { scoreDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type WeeklyPick = { id: string; week: number; topThree: string[]; songPrediction: string | null };
@@ -1427,23 +1427,52 @@ function DwtsLeaderboard({ league }: { league: League }) {
     return <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />;
   }
 
+  const scoredWeeks = Array.from(new Set(template.weeklyScores.map((s) => s.week))).sort((a, b) => a - b);
+
   return (
-    <div className="bg-card border border-cream/10 rounded-3xl p-2">
-      {standings.map((row, i) => (
-        <div
-          key={row.member.id}
-          className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0"
-          style={{ background: i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
-        >
-          <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
-          <span
-            className="w-7 h-7 rounded-full flex-none"
-            style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
-          />
-          <span className="flex-1 text-[14.5px] font-medium truncate">{row.member.user.name}</span>
-          <span className="font-display text-lg text-pink">{row.points}</span>
+    <div className="flex flex-col gap-4">
+      <div className="bg-card border border-cream/10 rounded-3xl p-6">
+        <h3 className="font-display text-lg tracking-wide mb-3">RESULTS SO FAR</h3>
+        <div className="flex flex-col gap-2">
+          {scoredWeeks.map((w) => {
+            const top3 = Array.from(actualTopThree(template.weeklyScores.filter((s) => s.week === w)));
+            return (
+              <p key={w} className="text-sm text-cream/70">
+                <span className="text-cream/45">Week {w} top three:</span>{" "}
+                {top3.length ? top3.join(", ") : "no scores over 0 yet"}
+              </p>
+            );
+          })}
+          {template.actualWinner && (
+            <p className="text-sm text-cream/70">
+              <span className="text-cream/45">Season winner:</span> {template.actualWinner}
+            </p>
+          )}
+          {template.actualFinalFour.length > 0 && (
+            <p className="text-sm text-cream/70">
+              <span className="text-cream/45">Final four:</span> {template.actualFinalFour.join(", ")}
+            </p>
+          )}
         </div>
-      ))}
+      </div>
+
+      <div className="bg-card border border-cream/10 rounded-3xl p-2">
+        {standings.map((row, i) => (
+          <div
+            key={row.member.id}
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0"
+            style={{ background: i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
+          >
+            <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
+            <span
+              className="w-7 h-7 rounded-full flex-none"
+              style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+            />
+            <span className="flex-1 text-[14.5px] font-medium truncate">{row.member.user.name}</span>
+            <span className="font-display text-lg text-pink">{row.points}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

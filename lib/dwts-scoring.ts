@@ -25,7 +25,7 @@ function pointsForLabel(rules: DwtsRule[], pattern: RegExp, fallback: number) {
 
 // The top three contestants for a week (ties included at the cutoff) —
 // same derivation the admin scoring screen uses to highlight "TOP 3".
-function actualTopThree(scoresThisWeek: DwtsWeeklyScoreEntry[]): Set<string> {
+export function actualTopThree(scoresThisWeek: DwtsWeeklyScoreEntry[]): Set<string> {
   const ranked = [...scoresThisWeek].sort((a, b) => b.score - a.score);
   if (ranked.length === 0) return new Set();
   const thirdScore = ranked.length >= 3 ? ranked[2].score : -Infinity;
