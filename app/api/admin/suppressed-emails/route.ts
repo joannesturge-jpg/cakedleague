@@ -10,13 +10,14 @@ export async function POST(request: Request) {
   if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
 
   const body = await request.json();
-  const raw = typeof body.emails === "string" ? body.emails : "";
-  const emails = Array.from(
+  const raw: string = typeof body.emails === "string" ? body.emails : "";
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emails: string[] = Array.from(
     new Set(
       raw
         .split(/[\s,]+/)
-        .map((e: string) => e.trim().toLowerCase())
-        .filter((e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => emailPattern.test(e))
     )
   );
 
