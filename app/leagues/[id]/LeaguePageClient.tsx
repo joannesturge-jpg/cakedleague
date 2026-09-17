@@ -634,7 +634,7 @@ export function LeaguePageClient({
 
       {tab === "rankings" &&
         (league.template?.pickFormat === "WEEKLY_TOP3" ? (
-          <DwtsLeaderboard league={league} />
+          <DwtsLeaderboard league={league} currentUserId={currentUserId} />
         ) : (
           <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />
         ))}
@@ -1479,40 +1479,10 @@ function SubmissionsTab({
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-2.5 mb-5">
-            <h3 className="font-display text-base tracking-wide text-cream/60">TOP THREE</h3>
-            {members.map((m) => {
-              const pick = m.weeklyPicks.find((p) => p.week === week);
-              const isMe = m.id === myMembershipId;
-              return (
-                <div
-                  key={m.id}
-                  className={`p-5 rounded-2xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-card"}`}
-                >
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <span className="font-display text-lg tracking-wide">{m.user.name}</span>
-                    {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
-                  </div>
-                  {pick ? (
-                    <ol className="flex flex-col gap-1">
-                      {pick.topThree.map((c, i) => (
-                        <li key={i} className="text-sm text-cream/78">
-                          {i + 1}. {c}
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="text-sm text-cream/40">Not submitted yet.</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
           {pickFormat === "WEEKLY_TOP3" && (() => {
             const withSongs = members.filter((m) => m.weeklyPicks.find((p) => p.week === week)?.songPrediction);
             return (
-              <div className="bg-card border border-cream/10 rounded-3xl p-6">
+              <div className="bg-card border border-cream/10 rounded-3xl p-6 mb-5">
                 <h3 className="font-display text-lg tracking-wide mb-1">SONG PREDICTIONS</h3>
                 <p className="text-sm text-cream/55 mb-4">
                   As commissioner, you are responsible for scoring this part! Select all song predictions that were
@@ -1561,13 +1531,43 @@ function SubmissionsTab({
               </div>
             );
           })()}
+
+          <div className="flex flex-col gap-2.5">
+            <h3 className="font-display text-base tracking-wide text-cream/60">TOP THREE</h3>
+            {members.map((m) => {
+              const pick = m.weeklyPicks.find((p) => p.week === week);
+              const isMe = m.id === myMembershipId;
+              return (
+                <div
+                  key={m.id}
+                  className={`p-5 rounded-2xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-card"}`}
+                >
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className="font-display text-lg tracking-wide">{m.user.name}</span>
+                    {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
+                  </div>
+                  {pick ? (
+                    <ol className="flex flex-col gap-1">
+                      {pick.topThree.map((c, i) => (
+                        <li key={i} className="text-sm text-cream/78">
+                          {i + 1}. {c}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="text-sm text-cream/40">Not submitted yet.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </>
       )}
     </div>
   );
 }
 
-function DwtsLeaderboard({ league }: { league: League }) {
+function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUserId: string }) {
   const template = league.template;
   if (!template) return null;
 
@@ -1630,21 +1630,29 @@ function DwtsLeaderboard({ league }: { league: League }) {
       </div>
 
       <div className="bg-card border border-cream/10 rounded-3xl p-2">
-        {standings.map((row, i) => (
-          <div
-            key={row.member.id}
-            className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0"
-            style={{ background: i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
-          >
-            <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
-            <span
-              className="w-7 h-7 rounded-full flex-none"
-              style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
-            />
-            <span className="flex-1 text-[14.5px] font-medium truncate">{row.member.user.name}</span>
-            <span className="font-display text-lg text-pink">{row.points}</span>
-          </div>
-        ))}
+        {standings.map((row, i) => {
+          const isMe = row.member.userId === currentUserId;
+          return (
+            <div
+              key={row.member.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0 ${
+                isMe ? "border border-pink" : ""
+              }`}
+              style={{ background: isMe ? "rgba(232,91,174,.12)" : i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
+            >
+              <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
+              <span
+                className="w-7 h-7 rounded-full flex-none"
+                style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+              />
+              <span className="flex-1 text-[14.5px] font-medium truncate flex items-center gap-2">
+                {row.member.user.name}
+                {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
+              </span>
+              <span className="font-display text-lg text-pink">{row.points}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
