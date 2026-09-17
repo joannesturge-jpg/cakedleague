@@ -27,7 +27,10 @@ export default async function LeaguePage({ params }: { params: { id: string } })
   const isMember = league.members.some((m) => m.userId === user.id);
   const isOwner = league.ownerId === user.id;
 
-  if (!isMember && !isOwner) {
+  // Admins can preview any league to see what a member/commissioner sees
+  // — not the same as being a member, so isOwner below stays accurate and
+  // owner-only controls stay hidden unless they actually own it too.
+  if (!isMember && !isOwner && !user.isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 px-10 py-24 text-center">
         <h1 className="font-display text-3xl tracking-wide">NOT A MEMBER</h1>

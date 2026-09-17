@@ -1,12 +1,15 @@
-// WEEKLY_TOP3 scoring (DWTS). Covers the weekly top-three prediction, the
-// season winner pick, the final four pre-season prediction, and the
-// injured/falls bonus rules. Point values come from the league's own
-// rules (a commissioner may have customized them), matched by label the
-// same way the admin scoring screen classifies rules.
+// WEEKLY_TOP3 scoring (DWTS). Covers the weekly top-three prediction, song
+// predictions, the season winner pick, the final four pre-season
+// prediction, and the injured/falls bonus rules. Point values come from
+// the league's own rules (a commissioner may have customized them),
+// matched by label the same way the admin scoring screen classifies
+// rules.
 //
-// "Weekly song prediction is correct" is the one seeded rule left out —
-// already documented as scored manually by each commissioner from their
-// league page, not something this engine touches.
+// Song predictions have no stored "actual song" to check picks against,
+// so they're the one thing in this engine that isn't derived from an
+// admin-entered answer key — a commissioner marks a member's guess
+// correct themselves (LeagueMemberWeeklyPick.songCorrect), and once set,
+// scores automatically like everything else here.
 //
 // Injured/falls attribution: the admin marks a couple injured/fallen for
 // a given week (a template-wide fact, same as an actual top-three
@@ -14,7 +17,7 @@
 // *their own* top-three pick for that same week — nothing else ties a
 // couple to a member in this pick format.
 export type DwtsWeeklyScoreEntry = { week: number; contestant: string; score: number };
-export type DwtsWeeklyPick = { week: number; topThree: string[] };
+export type DwtsWeeklyPick = { week: number; topThree: string[]; songCorrect?: boolean };
 export type DwtsRule = { label: string; points: number };
 export type DwtsRuleAward = { week: number; contestant: string; ruleLabel: string };
 
@@ -51,6 +54,7 @@ export function scoreWeeklyTopThree(
   if (!pick) return 0;
   const correctPoints = pointsForLabel(rules, /each correct couple/i, 10);
   const exactOrderPoints = pointsForLabel(rules, /exact order/i, 15);
+  const songPoints = pointsForLabel(rules, /song/i, 10);
 
   const top3 = actualTopThree(scoresThisWeek);
   const correct = pick.topThree.filter((c) => c && top3.has(c)).length;
@@ -60,6 +64,9 @@ export function scoreWeeklyTopThree(
   if (strict && pick.topThree[0] === strict[0] && pick.topThree[1] === strict[1] && pick.topThree[2] === strict[2]) {
     points += exactOrderPoints;
   }
+
+  if (pick.songCorrect) points += songPoints;
+
   return points;
 }
 

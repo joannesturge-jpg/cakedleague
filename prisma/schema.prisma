@@ -273,6 +273,11 @@ model LeagueMemberWeeklyPick {
   week           Int
   topThree       String[] @default([])
   songPrediction String?
+  // Set by the league's commissioner, not the member — song predictions
+  // aren't judged against a stored "actual" answer like the top three are,
+  // so this is the commissioner's own call, toggled from the Submissions
+  // tab and scored automatically once set.
+  songCorrect    Boolean  @default(false)
   submittedAt    DateTime @default(now())
 
   member   LeagueMember @relation(fields: [memberId], references: [id], onDelete: Cascade)

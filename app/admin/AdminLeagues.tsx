@@ -69,6 +69,11 @@ export function AdminLeagues({
     return [...Array.from(set).sort(), ...(hasUntagged ? [UNTAGGED] : [])];
   }, [leagues]);
 
+  function leagueUrl(id: string) {
+    if (typeof window === "undefined") return "#";
+    return `${window.location.protocol}//${window.location.host.replace(/^admin\./, "")}/leagues/${id}`;
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leagues.filter((l) => {
@@ -182,9 +187,15 @@ export function AdminLeagues({
                 key={l.id}
                 className="grid grid-cols-[2fr_1fr_1.4fr_1fr_1fr] gap-3.5 items-center px-[18px] py-3.5 border-b border-[#EDEFF3] last:border-0"
               >
-                <span className={`text-sm font-semibold truncate ${status === "Deleted" ? "text-[#8A909B]" : "text-[#16181D]"}`}>
+                <a
+                  href={leagueUrl(l.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open this league's overview page"
+                  className={`text-sm font-semibold truncate hover:underline ${status === "Deleted" ? "text-[#8A909B]" : "text-[#16181D] hover:text-purple"}`}
+                >
                   {l.name}
-                </span>
+                </a>
                 <span>
                   {l.tag ? (
                     <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold tracking-wide bg-[#F1E9FE] text-[#5B1FBF]">

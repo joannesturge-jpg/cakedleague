@@ -20,7 +20,13 @@ import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./Cate
 import { scoreDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
-type WeeklyPick = { id: string; week: number; topThree: string[]; songPrediction: string | null };
+type WeeklyPick = {
+  id: string;
+  week: number;
+  topThree: string[];
+  songPrediction: string | null;
+  songCorrect: boolean;
+};
 type CategoryPick = {
   id: string;
   week: number;
@@ -595,7 +601,14 @@ export function LeaguePageClient({
       )}
 
       {tab === "submissions" && (
-        <SubmissionsTab members={league.members} weeks={league.weeks ?? 11} myMembershipId={myMembership?.id ?? null} />
+        <SubmissionsTab
+          leagueId={league.id}
+          members={league.members}
+          weeks={league.weeks ?? 11}
+          myMembershipId={myMembership?.id ?? null}
+          isOwner={isOwner}
+          pickFormat={league.template?.pickFormat ?? null}
+        />
       )}
 
       {tab === "rankings" &&
@@ -1271,19 +1284,44 @@ function CategoryPicksForm({
 }
 
 function SubmissionsTab({
+  leagueId,
   members,
   weeks,
   myMembershipId,
+  isOwner,
+  pickFormat,
 }: {
+  leagueId: string;
   members: Member[];
   weeks: number;
   myMembershipId: string | null;
+  isOwner: boolean;
+  pickFormat: string | null;
 }) {
+  const router = useRouter();
   const [week, setWeek] = useState(1);
+  const [seasonOpen, setSeasonOpen] = useState(false);
+  const [songBusyKey, setSongBusyKey] = useState<string | null>(null);
   const me = members.find((m) => m.id === myMembershipId);
   const myPick = me?.weeklyPicks.find((p) => p.week === week);
   const unlocked = !!myPick;
   const seasonPredictionsUnlocked = !!me?.winnerPick && me.finalFourPicks.length === 4;
+  const seasonSubmittedCount = members.filter((m) => m.winnerPick && m.finalFourPicks.length === 4).length;
+
+  async function toggleSongCorrect(memberId: string, correct: boolean) {
+    const key = `${memberId}-${week}`;
+    setSongBusyKey(key);
+    try {
+      await fetch(`/api/leagues/${leagueId}/song-correct`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, week, correct }),
+      });
+      router.refresh();
+    } finally {
+      setSongBusyKey(null);
+    }
+  }
 
   return (
     <div>
@@ -1294,39 +1332,45 @@ function SubmissionsTab({
         </div>
       </div>
 
-      <div className="bg-card border border-cream/10 rounded-2xl p-4 mb-5">
-        <h3 className="font-display text-base tracking-wide mb-1.5">SEASON PREDICTIONS</h3>
-        {!seasonPredictionsUnlocked ? (
-          <p className="text-sm text-cream/55">
-            Lock in your season winner and final four picks on the Details tab to see everyone else&apos;s.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {members.map((m) => {
-              const isMe = m.id === myMembershipId;
-              return (
-                <div
-                  key={m.id}
-                  className={`px-3.5 py-2 rounded-xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-ink/40"}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold">{m.user.name}</span>
-                    {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
+      <div className="mb-5">
+        <Panel
+          title="SEASON PREDICTIONS"
+          count={`${seasonSubmittedCount}/${members.length} submitted`}
+          open={seasonOpen}
+          onToggle={() => setSeasonOpen((v) => !v)}
+        >
+          {!seasonPredictionsUnlocked ? (
+            <p className="text-sm text-cream/55">
+              Lock in your season winner and final four picks on the Details tab to see everyone else&apos;s.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {members.map((m) => {
+                const isMe = m.id === myMembershipId;
+                return (
+                  <div
+                    key={m.id}
+                    className={`px-3.5 py-2 rounded-xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-ink/40"}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">{m.user.name}</span>
+                      {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
+                    </div>
+                    {m.winnerPick && m.finalFourPicks.length === 4 ? (
+                      <p className="text-xs text-cream/68 leading-snug">
+                        Winner: {celebrityName(m.winnerPick)}
+                        <br />
+                        Top 4: {m.finalFourPicks.map(celebrityName).join(", ")}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-cream/40">Not submitted yet.</p>
+                    )}
                   </div>
-                  {m.winnerPick && m.finalFourPicks.length === 4 ? (
-                    <p className="text-xs text-cream/68 leading-snug">
-                      Winner: {celebrityName(m.winnerPick)}
-                      <br />
-                      Top 4: {m.finalFourPicks.map(celebrityName).join(", ")}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-cream/40">Not submitted yet.</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </Panel>
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
@@ -1356,39 +1400,83 @@ function SubmissionsTab({
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2.5">
-          {members.map((m) => {
-            const pick = m.weeklyPicks.find((p) => p.week === week);
-            const isMe = m.id === myMembershipId;
-            return (
-              <div
-                key={m.id}
-                className={`p-5 rounded-2xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-card"}`}
-              >
-                <div className="flex items-center gap-2 mb-2.5">
-                  <span className="font-display text-lg tracking-wide">{m.user.name}</span>
-                  {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
-                </div>
-                {pick ? (
-                  <>
-                    <ol className="flex flex-col gap-1 mb-2">
+        <>
+          <div className="flex flex-col gap-2.5 mb-5">
+            <h3 className="font-display text-base tracking-wide text-cream/60">TOP THREE</h3>
+            {members.map((m) => {
+              const pick = m.weeklyPicks.find((p) => p.week === week);
+              const isMe = m.id === myMembershipId;
+              return (
+                <div
+                  key={m.id}
+                  className={`p-5 rounded-2xl border ${isMe ? "border-pink bg-pink/10" : "border-cream/10 bg-card"}`}
+                >
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className="font-display text-lg tracking-wide">{m.user.name}</span>
+                    {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
+                  </div>
+                  {pick ? (
+                    <ol className="flex flex-col gap-1">
                       {pick.topThree.map((c, i) => (
                         <li key={i} className="text-sm text-cream/78">
                           {i + 1}. {c}
                         </li>
                       ))}
                     </ol>
-                    {pick.songPrediction && (
-                      <p className="text-xs text-cream/50">Song: {pick.songPrediction}</p>
-                    )}
-                  </>
+                  ) : (
+                    <p className="text-sm text-cream/40">Not submitted yet.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {pickFormat === "WEEKLY_TOP3" && (() => {
+            const withSongs = members.filter((m) => m.weeklyPicks.find((p) => p.week === week)?.songPrediction);
+            return (
+              <div className="bg-card border border-cream/10 rounded-3xl p-6">
+                <h3 className="font-display text-lg tracking-wide mb-1">SONG PREDICTIONS</h3>
+                <p className="text-sm text-cream/55 mb-4">
+                  As commissioner, you are responsible for scoring this part! Select all song predictions that were
+                  correct for this week and they will be scored.
+                </p>
+                {withSongs.length === 0 ? (
+                  <p className="text-sm text-cream/40">No song predictions submitted for this week.</p>
                 ) : (
-                  <p className="text-sm text-cream/40">Not submitted yet.</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {withSongs.map((m) => {
+                      const pick = m.weeklyPicks.find((p) => p.week === week)!;
+                      const busy = songBusyKey === `${m.id}-${week}`;
+                      const chip = (
+                        <span
+                          className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                            pick.songCorrect
+                              ? "border-pink bg-pink/15 text-pink"
+                              : "border-cream/15 bg-ink/40 text-cream/80"
+                          } ${isOwner ? "hover:border-pink cursor-pointer" : ""} ${busy ? "opacity-50" : ""}`}
+                        >
+                          {pick.songCorrect ? "✓ " : ""}
+                          {m.user.name}: {pick.songPrediction}
+                        </span>
+                      );
+                      return isOwner ? (
+                        <button
+                          key={m.id}
+                          disabled={busy}
+                          onClick={() => toggleSongCorrect(m.id, !pick.songCorrect)}
+                        >
+                          {chip}
+                        </button>
+                      ) : (
+                        <span key={m.id}>{chip}</span>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             );
-          })}
-        </div>
+          })()}
+        </>
       )}
     </div>
   );
