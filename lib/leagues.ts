@@ -242,6 +242,36 @@ export function isWeekOpen(
   return now.getTime() >= openAt.getTime();
 }
 
+// The real instant week N's picks are due — the other end of the window
+// from weekOpenInstant. Leagues with no startDate to anchor week numbers
+// against can't say when any given week's deadline is, so those default
+// to never-passed rather than guessing.
+export function weekDueInstant(
+  week: number,
+  dueDay: string,
+  dueTime: string,
+  timezone: string,
+  startDate: Date | null
+): Date | null {
+  const dueCalendar = weekDueCalendarDate(week, dueDay, dueTime, timezone, startDate);
+  if (!dueCalendar) return null;
+  const [h, m] = dueTime.split(":").map(Number);
+  return zonedInstant(dueCalendar.getUTCFullYear(), dueCalendar.getUTCMonth() + 1, dueCalendar.getUTCDate(), h, m, timezone);
+}
+
+export function isWeekDuePassed(
+  week: number,
+  dueDay: string,
+  dueTime: string,
+  timezone: string,
+  startDate: Date | null,
+  now: Date = new Date()
+): boolean {
+  const dueAt = weekDueInstant(week, dueDay, dueTime, timezone, startDate);
+  if (!dueAt) return false;
+  return now.getTime() > dueAt.getTime();
+}
+
 // Formats an arbitrary instant (like a picks-open time) as a concrete date
 // in the given zone — same style as formatNextDueDate.
 export function formatOpenDate(instant: Date, timezone: string) {

@@ -9,6 +9,8 @@ import {
   isSeasonPredictionsLocked,
   isWeekOpen,
   weekOpenInstant,
+  isWeekDuePassed,
+  weekDueInstant,
   DUE_DAYS,
   DUE_DAY_LABELS,
   TIMEZONES,
@@ -867,7 +869,9 @@ function WeeklyPicksForm({
   const startDateObj = startDate ? new Date(startDate) : null;
   const weekOpen = isWeekOpen(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
   const weekOpensAt = weekOpen ? null : weekOpenInstant(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
-  const canSave = weekOpen && draftTop.every((c) => c) && new Set(draftTop).size === 3;
+  const weekDuePassed = isWeekDuePassed(selectedWeek, dueDay, dueTime, timezone, startDateObj);
+  const weekDueAt = weekDuePassed ? weekDueInstant(selectedWeek, dueDay, dueTime, timezone, startDateObj) : null;
+  const canSave = weekOpen && !weekDuePassed && draftTop.every((c) => c) && new Set(draftTop).size === 3;
 
   return (
     <div className="flex flex-col gap-3">
@@ -1006,7 +1010,7 @@ function WeeklyPicksForm({
               ))}
             </select>
           </div>
-          {weeklyEditing && weekOpen ? (
+          {weeklyEditing && weekOpen && !weekDuePassed ? (
             <button
               onClick={() => setShowContestants(true)}
               className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
@@ -1014,7 +1018,8 @@ function WeeklyPicksForm({
               See Contestants
             </button>
           ) : (
-            existing && (
+            existing &&
+            !weekDuePassed && (
               <button
                 onClick={enterWeeklyEdit}
                 className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
@@ -1051,6 +1056,11 @@ function WeeklyPicksForm({
           <p className="text-sm text-cream/50 mt-3">
             Picks for week {selectedWeek} aren&apos;t open yet.
             {weekOpensAt && <> They open {formatOpenDate(weekOpensAt, timezone)} {TIMEZONE_ABBR[timezone] ?? ""}.</>}
+          </p>
+        ) : weekDuePassed ? (
+          <p className="text-sm text-cream/50 mt-3">
+            Picks for week {selectedWeek} are closed.
+            {weekDueAt && <> They were due {formatOpenDate(weekDueAt, timezone)} {TIMEZONE_ABBR[timezone] ?? ""}.</>}
           </p>
         ) : (
           <>
@@ -1311,7 +1321,7 @@ function SubmissionsTab({
   const router = useRouter();
   const [week, setWeek] = useState(1);
   const [seasonOpen, setSeasonOpen] = useState(false);
-  const [songBusyKey, setSongBusyKey] = useState<string | null>(null);
+  const [songSaving, setSongSaving] = useState(false);
   const me = members.find((m) => m.id === myMembershipId);
   const myPick = me?.weeklyPicks.find((p) => p.week === week);
   // Normally you have to submit your own picks to see everyone else's —
@@ -1321,18 +1331,50 @@ function SubmissionsTab({
   const seasonPredictionsUnlocked = (!!me?.winnerPick && me.finalFourPicks.length === 4) || isAdminPreview;
   const seasonSubmittedCount = members.filter((m) => m.winnerPick && m.finalFourPicks.length === 4).length;
 
-  async function toggleSongCorrect(memberId: string, correct: boolean) {
-    const key = `${memberId}-${week}`;
-    setSongBusyKey(key);
+  // Song correctness is drafted locally and only sent once "Save" is
+  // pressed — clicking a chip shouldn't fire a request per click. Re-seeds
+  // whenever the selected week changes.
+  const [songDraft, setSongDraft] = useState<Record<string, boolean>>({});
+  const [songSyncedKey, setSongSyncedKey] = useState("");
+  const songKey = `${leagueId}-${week}`;
+  if (songKey !== songSyncedKey) {
+    setSongSyncedKey(songKey);
+    const seed: Record<string, boolean> = {};
+    for (const m of members) {
+      const p = m.weeklyPicks.find((p) => p.week === week);
+      if (p?.songPrediction) seed[m.id] = p.songCorrect;
+    }
+    setSongDraft(seed);
+  }
+
+  function toggleDraftSong(memberId: string) {
+    setSongDraft((prev) => ({ ...prev, [memberId]: !prev[memberId] }));
+  }
+
+  const songPendingChanges = members
+    .map((m) => {
+      const p = m.weeklyPicks.find((p) => p.week === week);
+      if (!p?.songPrediction) return null;
+      const draftVal = songDraft[m.id] ?? p.songCorrect;
+      return draftVal !== p.songCorrect ? { memberId: m.id, correct: draftVal } : null;
+    })
+    .filter((x): x is { memberId: string; correct: boolean } => !!x);
+
+  async function saveSongPredictions() {
+    setSongSaving(true);
     try {
-      await fetch(`/api/leagues/${leagueId}/song-correct`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberId, week, correct }),
-      });
+      await Promise.all(
+        songPendingChanges.map((c) =>
+          fetch(`/api/leagues/${leagueId}/song-correct`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ memberId: c.memberId, week, correct: c.correct }),
+          })
+        )
+      );
       router.refresh();
     } finally {
-      setSongBusyKey(null);
+      setSongSaving(false);
     }
   }
 
@@ -1456,35 +1498,42 @@ function SubmissionsTab({
                 {withSongs.length === 0 ? (
                   <p className="text-sm text-cream/40">No song predictions submitted for this week.</p>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {withSongs.map((m) => {
-                      const pick = m.weeklyPicks.find((p) => p.week === week)!;
-                      const busy = songBusyKey === `${m.id}-${week}`;
-                      const chip = (
-                        <span
-                          className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
-                            pick.songCorrect
-                              ? "border-pink bg-pink/15 text-pink"
-                              : "border-cream/15 bg-ink/40 text-cream/80"
-                          } ${isOwner ? "hover:border-pink cursor-pointer" : ""} ${busy ? "opacity-50" : ""}`}
-                        >
-                          {pick.songCorrect ? "✓ " : ""}
-                          {m.user.name}: {pick.songPrediction}
-                        </span>
-                      );
-                      return isOwner ? (
-                        <button
-                          key={m.id}
-                          disabled={busy}
-                          onClick={() => toggleSongCorrect(m.id, !pick.songCorrect)}
-                        >
-                          {chip}
-                        </button>
-                      ) : (
-                        <span key={m.id}>{chip}</span>
-                      );
-                    })}
-                  </div>
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {withSongs.map((m) => {
+                        const pick = m.weeklyPicks.find((p) => p.week === week)!;
+                        const draftCorrect = songDraft[m.id] ?? pick.songCorrect;
+                        const chip = (
+                          <span
+                            className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                              draftCorrect
+                                ? "border-pink bg-pink/15 text-pink"
+                                : "border-cream/15 bg-ink/40 text-cream/80"
+                            } ${isOwner ? "hover:border-pink cursor-pointer" : ""}`}
+                          >
+                            {draftCorrect ? "✓ " : ""}
+                            {m.user.name}: {pick.songPrediction}
+                          </span>
+                        );
+                        return isOwner ? (
+                          <button key={m.id} onClick={() => toggleDraftSong(m.id)}>
+                            {chip}
+                          </button>
+                        ) : (
+                          <span key={m.id}>{chip}</span>
+                        );
+                      })}
+                    </div>
+                    {isOwner && songPendingChanges.length > 0 && (
+                      <button
+                        onClick={saveSongPredictions}
+                        disabled={songSaving}
+                        className="mt-4 px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+                      >
+                        {songSaving ? "Saving…" : `Save (${songPendingChanges.length})`}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             );
