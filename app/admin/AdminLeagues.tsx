@@ -5,6 +5,7 @@ export type AdminLeagueRow = {
   id: string;
   name: string;
   tag: string | null;
+  templateId: string | null;
   isActive: boolean;
   deletedAt: Date | null;
   _count: { members: number };
@@ -19,10 +20,48 @@ function statusOf(l: AdminLeagueRow): Exclude<StatusFilter, "All"> {
 
 const UNTAGGED = "Untagged";
 
-export function AdminLeagues({ leagues }: { leagues: AdminLeagueRow[] }) {
+export function AdminLeagues({
+  leagues,
+  templateNameById,
+}: {
+  leagues: AdminLeagueRow[];
+  templateNameById: Record<string, string>;
+}) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [tagFilter, setTagFilter] = useState<string>("All");
+
+  // Leagues showing the same tag/template name can still point at
+  // different LeagueTemplate rows if more than one was ever created for
+  // the same show — which would split their scoring apart even though
+  // everything looks identical in the UI. Grouping by the real
+  // templateId (not just the tag) surfaces that split immediately.
+  const templateGroups = useMemo(() => {
+    const nonDeleted = leagues.filter((l) => !l.deletedAt);
+    const counts = new Map<string, number>();
+    for (const l of nonDeleted) {
+      const key = l.templateId ?? "__none__";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([templateId, count]) => ({
+        templateId,
+        name: templateId === "__none__" ? "No template (custom league)" : templateNameById[templateId] ?? "Unknown template",
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [leagues, templateNameById]);
+
+  // More than one templateId sharing the same resolved name is exactly
+  // the split described above.
+  const nameCollisions = useMemo(() => {
+    const byName = new Map<string, number>();
+    for (const g of templateGroups) {
+      if (g.templateId === "__none__") continue;
+      byName.set(g.name, (byName.get(g.name) ?? 0) + 1);
+    }
+    return new Set(Array.from(byName.entries()).filter(([, n]) => n > 1).map(([name]) => name));
+  }, [templateGroups]);
 
   const tags = useMemo(() => {
     const set = new Set(leagues.map((l) => l.tag).filter((t): t is string => !!t));
@@ -51,6 +90,35 @@ export function AdminLeagues({ leagues }: { leagues: AdminLeagueRow[] }) {
             {leagues.length} {leagues.length === 1 ? "league" : "leagues"} ever created
           </p>
         </div>
+      </div>
+
+      <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px] mb-4">
+        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-3">
+          ACTIVE LEAGUES BY TEMPLATE
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {templateGroups.map((g) => (
+            <div key={g.templateId} className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-[#16181D] flex items-center gap-2">
+                {g.name}
+                {nameCollisions.has(g.name) && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-[#FDF2F4] text-[#C2314E]">
+                    SPLIT — {g.templateId}
+                  </span>
+                )}
+              </span>
+              <span className="font-semibold text-[#5B6270]">
+                {g.count} league{g.count === 1 ? "" : "s"}
+              </span>
+            </div>
+          ))}
+        </div>
+        {nameCollisions.size > 0 && (
+          <p className="text-xs text-[#C2314E] mt-3">
+            Two or more leagues share a template name but not the same template id — scores entered against one
+            won&apos;t apply to leagues built on the other. Check League Templates for a duplicate.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-2.5 flex-wrap p-3.5 bg-white border border-[#E2E4E9] rounded-t-lg">
@@ -99,10 +167,11 @@ export function AdminLeagues({ leagues }: { leagues: AdminLeagueRow[] }) {
       </div>
 
       <div className="bg-white border border-[#E2E4E9] rounded-b-lg overflow-x-auto">
-        <div className="min-w-[560px]">
-          <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-3.5 px-[18px] py-3 bg-[#F8F9FB] border-b border-[#E2E4E9] text-[10.5px] tracking-widest text-[#8A909B] font-bold">
+        <div className="min-w-[760px]">
+          <div className="grid grid-cols-[2fr_1fr_1.4fr_1fr_1fr] gap-3.5 px-[18px] py-3 bg-[#F8F9FB] border-b border-[#E2E4E9] text-[10.5px] tracking-widest text-[#8A909B] font-bold">
             <span>LEAGUE NAME</span>
             <span>TAG</span>
+            <span>TEMPLATE</span>
             <span>ACTIVE MEMBERS</span>
             <span>STATUS</span>
           </div>
@@ -111,7 +180,7 @@ export function AdminLeagues({ leagues }: { leagues: AdminLeagueRow[] }) {
             return (
               <div
                 key={l.id}
-                className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-3.5 items-center px-[18px] py-3.5 border-b border-[#EDEFF3] last:border-0"
+                className="grid grid-cols-[2fr_1fr_1.4fr_1fr_1fr] gap-3.5 items-center px-[18px] py-3.5 border-b border-[#EDEFF3] last:border-0"
               >
                 <span className={`text-sm font-semibold truncate ${status === "Deleted" ? "text-[#8A909B]" : "text-[#16181D]"}`}>
                   {l.name}
@@ -124,6 +193,10 @@ export function AdminLeagues({ leagues }: { leagues: AdminLeagueRow[] }) {
                   ) : (
                     <span className="text-[13px] text-[#B4B9C2]">—</span>
                   )}
+                </span>
+                <span className="text-xs text-[#5B6270] truncate" title={l.templateId ?? ""}>
+                  {l.templateId ? (templateNameById[l.templateId] ?? "Unknown") : "—"}
+                  {l.templateId && <span className="text-[#B4B9C2]"> ({l.templateId})</span>}
                 </span>
                 <span className="text-sm">{l._count.members}</span>
                 <span>

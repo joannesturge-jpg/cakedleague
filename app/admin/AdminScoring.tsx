@@ -215,7 +215,14 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
         <div>
           <h1 className="font-display text-2xl sm:text-3xl tracking-wide">WEEKLY SCORING</h1>
           <p className="text-sm text-[#6B7280] mt-1">
-            Applies to every league on the {template.tag ?? "matching"} tag automatically.
+            Applies to every league built from this exact template — id <code className="text-[#16181D]">{template.id}</code>.
+            {templates.filter((t) => t.tag === template.tag).length > 1 && (
+              <span className="text-[#C2314E] font-semibold">
+                {" "}
+                {templates.filter((t) => t.tag === template.tag).length} templates share the {template.tag} tag — make
+                sure this is the one your leagues are actually built on (check the Leagues tab).
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -231,7 +238,7 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
         >
           {templates.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.tag ? `${t.tag} — ${t.name}` : t.name}
+              {t.tag ? `${t.tag} — ${t.name}` : t.name} ({t.id})
             </option>
           ))}
         </select>

@@ -42,6 +42,7 @@ export function AdminShell({
 }) {
   const router = useRouter();
   const [tab, setTabState] = useState<AdminTab>(initialTab);
+  const templateNameById = Object.fromEntries(templates.map((t) => [t.id, t.name]));
 
   function setTab(next: AdminTab) {
     setTabState(next);
@@ -88,7 +89,7 @@ export function AdminShell({
           <AdminTemplates templates={templates} publicLeagueByTemplate={publicLeagueByTemplate} />
         )}
         {tab === "scoring" && <AdminScoring templates={templates} />}
-        {tab === "leagues" && <AdminLeagues leagues={leagues} />}
+        {tab === "leagues" && <AdminLeagues leagues={leagues} templateNameById={templateNameById} />}
         {tab === "marketing" && <AdminMarketing signups={notifySignups} />}
         {tab === "analytics" && <AdminAnalytics data={analytics} />}
       </div>
