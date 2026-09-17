@@ -629,6 +629,7 @@ export function LeaguePageClient({
           isOwner={isOwner}
           isAdminPreview={isAdminPreview}
           pickFormat={league.template?.pickFormat ?? null}
+          weeklyScores={league.template?.weeklyScores ?? []}
         />
       )}
 
@@ -1332,6 +1333,7 @@ function SubmissionsTab({
   isOwner,
   isAdminPreview,
   pickFormat,
+  weeklyScores,
 }: {
   leagueId: string;
   members: Member[];
@@ -1340,9 +1342,16 @@ function SubmissionsTab({
   isOwner: boolean;
   isAdminPreview: boolean;
   pickFormat: string | null;
+  weeklyScores: { week: number }[];
 }) {
   const router = useRouter();
-  const [week, setWeek] = useState(1);
+  // Same "next unscored week" default as the pick form — once a week's
+  // scored, there's no reason to land on it instead of the current one.
+  const [week, setWeek] = useState(() => {
+    const scoredWeeks = weeklyScores.map((s) => s.week);
+    const nextWeek = (scoredWeeks.length ? Math.max(...scoredWeeks) : 0) + 1;
+    return Math.min(Math.max(nextWeek, 1), weeks || 1);
+  });
   const [seasonOpen, setSeasonOpen] = useState(false);
   const [songSaving, setSongSaving] = useState(false);
   const me = members.find((m) => m.id === myMembershipId);
