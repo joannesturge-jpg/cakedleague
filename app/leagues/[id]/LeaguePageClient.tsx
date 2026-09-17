@@ -19,7 +19,8 @@ import {
 } from "@/lib/leagues";
 import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
-import { scoreDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
+import { breakdownDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
+import { ScoreBreakdownModal } from "./ScoreBreakdownModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type WeeklyPick = {
@@ -1578,6 +1579,7 @@ function SubmissionsTab({
 
 function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUserId: string }) {
   const template = league.template;
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   if (!template) return null;
 
   const hasAnyResults =
@@ -1589,9 +1591,8 @@ function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUse
   const ruleAwards = template.ruleAwards.map((a) => ({ week: a.week, contestant: a.contestant, ruleLabel: a.rule.label }));
 
   const standings = league.members
-    .map((m) => ({
-      member: m,
-      points: scoreDwtsMember({
+    .map((m) => {
+      const groups = breakdownDwtsMember({
         winnerPick: m.winnerPick,
         finalFourPicks: m.finalFourPicks,
         weeklyPicks: m.weeklyPicks,
@@ -1601,13 +1602,16 @@ function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUse
         actualFinalFour: template.actualFinalFour,
         eliminatedContestants: template.eliminatedContestants,
         rules: league.rules,
-      }),
-    }))
+      });
+      return { member: m, groups, points: groups.reduce((sum, g) => sum + g.total, 0) };
+    })
     .sort((a, b) => b.points - a.points);
 
   if (!hasAnyResults) {
     return <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />;
   }
+
+  const selected = standings.find((s) => s.member.id === selectedMemberId);
 
   const scoredWeeks = Array.from(new Set(template.weeklyScores.map((s) => s.week))).sort((a, b) => a - b);
 
@@ -1658,11 +1662,26 @@ function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUse
                 {row.member.user.name}
                 {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
               </span>
-              <span className="font-display text-lg text-pink">{row.points}</span>
+              <button
+                onClick={() => setSelectedMemberId(row.member.id)}
+                className="font-display text-lg text-pink hover:text-cream transition"
+                title="See how this score breaks down"
+              >
+                {row.points}
+              </button>
             </div>
           );
         })}
       </div>
+
+      {selected && (
+        <ScoreBreakdownModal
+          memberName={selected.member.user.name}
+          totalPoints={selected.points}
+          groups={selected.groups}
+          onClose={() => setSelectedMemberId(null)}
+        />
+      )}
     </div>
   );
 }

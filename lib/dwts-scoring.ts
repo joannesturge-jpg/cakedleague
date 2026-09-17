@@ -17,7 +17,7 @@
 // *their own* top-three pick for that same week — nothing else ties a
 // couple to a member in this pick format.
 export type DwtsWeeklyScoreEntry = { week: number; contestant: string; score: number };
-export type DwtsWeeklyPick = { week: number; topThree: string[]; songCorrect?: boolean };
+export type DwtsWeeklyPick = { week: number; topThree: string[]; songPrediction?: string | null; songCorrect?: boolean };
 export type DwtsRule = { label: string; points: number };
 export type DwtsRuleAward = { week: number; contestant: string; ruleLabel: string };
 
@@ -74,71 +74,17 @@ function matchesPositionGroups(pick: string[], groups: string[][]): boolean {
   return true;
 }
 
-export function scoreWeeklyTopThree(
-  pick: DwtsWeeklyPick | undefined,
-  scoresThisWeek: DwtsWeeklyScoreEntry[],
-  rules: DwtsRule[]
-): number {
-  if (!pick) return 0;
-  const correctPoints = pointsForLabel(rules, /each correct couple/i, 10);
-  const exactOrderPoints = pointsForLabel(rules, /exact order/i, 15);
-  const songPoints = pointsForLabel(rules, /song/i, 10);
+const INJURED_PATTERN = /injured/i;
+const FALLS_PATTERN = /falls/i;
 
-  const top3 = actualTopThree(scoresThisWeek);
-  const correct = pick.topThree.filter((c) => c && top3.has(c)).length;
-  let points = correct * correctPoints;
+export type DwtsScoreLine = { label: string; points: number };
+export type DwtsScoreGroup = { key: string; title: string; total: number; lines: DwtsScoreLine[] };
 
-  const groups = topThreePositionGroups(scoresThisWeek);
-  if (groups && matchesPositionGroups(pick.topThree, groups)) {
-    points += exactOrderPoints;
-  }
-
-  if (pick.songCorrect) points += songPoints;
-
-  return points;
-}
-
-export function scoreSeasonWinner(
-  pick: string | null,
-  actualWinner: string | null,
-  eliminatedContestants: string[],
-  rules: DwtsRule[]
-): number {
-  if (!pick) return 0;
-  if (actualWinner && pick === actualWinner) return pointsForLabel(rules, /winner pick is correct/i, 20);
-  if (eliminatedContestants.includes(pick)) return pointsForLabel(rules, /winner pick is eliminated/i, -10);
-  return 0;
-}
-
-// +5 per correct name — not a configurable LeagueRule, just the flat
-// value documented on LeagueMember.finalFourPicks.
-export function scoreFinalFour(picks: string[], actualFinalFour: string[]): number {
-  if (actualFinalFour.length === 0) return 0;
-  return picks.filter((c) => actualFinalFour.includes(c)).length * 5;
-}
-
-export function scoreWeeklyBonusAwards(
-  weeklyPicks: DwtsWeeklyPick[],
-  awards: DwtsRuleAward[],
-  rules: DwtsRule[]
-): number {
-  const injuredPattern = /injured/i;
-  const fallsPattern = /falls/i;
-  let total = 0;
-  for (const award of awards) {
-    const isInjured = injuredPattern.test(award.ruleLabel);
-    const isFalls = !isInjured && fallsPattern.test(award.ruleLabel);
-    if (!isInjured && !isFalls) continue;
-
-    const pick = weeklyPicks.find((p) => p.week === award.week);
-    if (!pick || !pick.topThree.includes(award.contestant)) continue;
-
-    total += isInjured ? pointsForLabel(rules, injuredPattern, 5) : pointsForLabel(rules, fallsPattern, -5);
-  }
-  return total;
-}
-
-export function scoreDwtsMember(params: {
+// The itemized version of scoreDwtsMember — one group per week (plus a
+// "Season" group for the winner pick and final four), each with the
+// individual line items that added up to that group's total. This is the
+// source of truth; scoreDwtsMember just sums it.
+export function breakdownDwtsMember(params: {
   winnerPick: string | null;
   finalFourPicks: string[];
   weeklyPicks: DwtsWeeklyPick[];
@@ -148,7 +94,7 @@ export function scoreDwtsMember(params: {
   actualFinalFour: string[];
   eliminatedContestants: string[];
   rules: DwtsRule[];
-}): number {
+}): DwtsScoreGroup[] {
   const {
     winnerPick,
     finalFourPicks,
@@ -161,9 +107,22 @@ export function scoreDwtsMember(params: {
     rules,
   } = params;
 
-  let total = scoreSeasonWinner(winnerPick, actualWinner, eliminatedContestants, rules);
-  total += scoreFinalFour(finalFourPicks, actualFinalFour);
-  total += scoreWeeklyBonusAwards(weeklyPicks, ruleAwards, rules);
+  const groups: DwtsScoreGroup[] = [];
+
+  const seasonLines: DwtsScoreLine[] = [];
+  if (winnerPick && actualWinner && winnerPick === actualWinner) {
+    seasonLines.push({ label: `Season winner pick correct — ${winnerPick}`, points: pointsForLabel(rules, /winner pick is correct/i, 20) });
+  } else if (winnerPick && eliminatedContestants.includes(winnerPick)) {
+    seasonLines.push({ label: `Season winner pick eliminated — ${winnerPick}`, points: pointsForLabel(rules, /winner pick is eliminated/i, -10) });
+  }
+  if (actualFinalFour.length > 0) {
+    for (const name of finalFourPicks) {
+      if (actualFinalFour.includes(name)) seasonLines.push({ label: `Final four correct — ${name}`, points: 5 });
+    }
+  }
+  if (seasonLines.length > 0) {
+    groups.push({ key: "season", title: "Season", total: seasonLines.reduce((s, l) => s + l.points, 0), lines: seasonLines });
+  }
 
   const scoresByWeek = new Map<number, DwtsWeeklyScoreEntry[]>();
   for (const s of weeklyScores) {
@@ -171,9 +130,61 @@ export function scoreDwtsMember(params: {
     list.push(s);
     scoresByWeek.set(s.week, list);
   }
-  for (const pick of weeklyPicks) {
-    total += scoreWeeklyTopThree(pick, scoresByWeek.get(pick.week) ?? [], rules);
+  const awardsByWeek = new Map<number, DwtsRuleAward[]>();
+  for (const a of ruleAwards) {
+    const list = awardsByWeek.get(a.week) ?? [];
+    list.push(a);
+    awardsByWeek.set(a.week, list);
   }
 
-  return total;
+  const correctPoints = pointsForLabel(rules, /each correct couple/i, 10);
+  const exactOrderPoints = pointsForLabel(rules, /exact order/i, 15);
+  const songPoints = pointsForLabel(rules, /song/i, 10);
+
+  const sortedPicks = [...weeklyPicks].sort((a, b) => a.week - b.week);
+  for (const pick of sortedPicks) {
+    const lines: DwtsScoreLine[] = [];
+    const weekScores = scoresByWeek.get(pick.week) ?? [];
+
+    const top3 = actualTopThree(weekScores);
+    for (const c of pick.topThree) {
+      if (c && top3.has(c)) lines.push({ label: `Correct couple in top three — ${c}`, points: correctPoints });
+    }
+
+    const groups3 = topThreePositionGroups(weekScores);
+    if (groups3 && matchesPositionGroups(pick.topThree, groups3)) {
+      lines.push({ label: "Top three in exact order", points: exactOrderPoints });
+    }
+
+    if (pick.songCorrect) {
+      lines.push({
+        label: pick.songPrediction ? `Song prediction correct — ${pick.songPrediction}` : "Song prediction correct",
+        points: songPoints,
+      });
+    }
+
+    for (const award of awardsByWeek.get(pick.week) ?? []) {
+      if (!pick.topThree.includes(award.contestant)) continue;
+      if (INJURED_PATTERN.test(award.ruleLabel)) {
+        lines.push({ label: `Injured bonus — ${award.contestant}`, points: pointsForLabel(rules, INJURED_PATTERN, 5) });
+      } else if (FALLS_PATTERN.test(award.ruleLabel)) {
+        lines.push({ label: `Fall penalty — ${award.contestant}`, points: pointsForLabel(rules, FALLS_PATTERN, -5) });
+      }
+    }
+
+    if (lines.length > 0) {
+      groups.push({
+        key: `week-${pick.week}`,
+        title: `Week ${pick.week}`,
+        total: lines.reduce((s, l) => s + l.points, 0),
+        lines,
+      });
+    }
+  }
+
+  return groups;
+}
+
+export function scoreDwtsMember(params: Parameters<typeof breakdownDwtsMember>[0]): number {
+  return breakdownDwtsMember(params).reduce((sum, g) => sum + g.total, 0);
 }
