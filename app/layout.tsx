@@ -1,15 +1,25 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { MobileNav } from "@/app/components/MobileNav";
 import { Analytics } from "@/app/components/Analytics";
+import { PwaRegister } from "@/app/components/PwaRegister";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Caked Leagues",
   description: "Draft anything. Even the weird stuff.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Caked",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1C0F2E",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -33,6 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="bg-ink text-cream font-sans">
         <Analytics />
+        <PwaRegister />
         <header className="sticky top-0 z-50 flex items-center justify-between gap-3 flex-wrap px-5 sm:px-7 py-3 bg-ink/90 backdrop-blur-md border-b border-cream/10">
           <Link href="/" className="flex items-baseline gap-2 flex-none">
             <span className="font-display text-2xl tracking-wide">CAKED</span>
