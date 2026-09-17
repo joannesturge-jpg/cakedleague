@@ -24,7 +24,7 @@ function inLastNDays(dates: Date[], n: number, offsetDays = 0) {
   return dates.filter((d) => d.getTime() > start && d.getTime() <= end).length;
 }
 
-export type AdminTab = "users" | "templates" | "scoring" | "leagues" | "marketing" | "analytics" | "unsubscribed";
+export type AdminTab = "users" | "templates" | "scoring" | "leagues" | "analytics" | "unsubscribed";
 
 export async function AdminDashboard({ initialTab = "users" }: { initialTab?: AdminTab } = {}) {
   // The admin dashboard is only reachable at admin.<domain> — never on the
@@ -193,7 +193,6 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
       adminEmail={user.email}
       users={users}
       templates={templates}
-      notifySignups={notifySignups}
       publicLeagueByTemplate={publicLeagueByTemplate}
       leagues={allLeagues}
       analytics={analytics}

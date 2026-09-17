@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { AdminUsers, type AdminUserRow } from "./AdminUsers";
 import { AdminTemplates, type AdminTemplateRow } from "./AdminTemplates";
-import { AdminMarketing, type NotifySignupRow } from "./AdminMarketing";
 import { AdminLeagues, type AdminLeagueRow } from "./AdminLeagues";
 import { AdminScoring } from "./AdminScoring";
 import { AdminAnalytics, type AdminAnalyticsData } from "./AdminAnalytics";
@@ -18,7 +17,6 @@ const TAB_PATHS: Record<AdminTab, string> = {
   templates: "/templates",
   scoring: "/scoring",
   leagues: "/leagues",
-  marketing: "/marketing",
   analytics: "/analytics",
   unsubscribed: "/unsubscribed",
 };
@@ -28,7 +26,6 @@ export function AdminShell({
   adminEmail,
   users,
   templates,
-  notifySignups,
   publicLeagueByTemplate,
   leagues,
   analytics,
@@ -38,7 +35,6 @@ export function AdminShell({
   adminEmail: string;
   users: AdminUserRow[];
   templates: AdminTemplateRow[];
-  notifySignups: NotifySignupRow[];
   publicLeagueByTemplate: Record<string, string>;
   leagues: AdminLeagueRow[];
   analytics: AdminAnalyticsData;
@@ -79,9 +75,6 @@ export function AdminShell({
         <TabButton active={tab === "leagues"} onClick={() => setTab("leagues")}>
           Leagues
         </TabButton>
-        <TabButton active={tab === "marketing"} onClick={() => setTab("marketing")}>
-          Marketing
-        </TabButton>
         <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")}>
           Analytics
         </TabButton>
@@ -97,7 +90,6 @@ export function AdminShell({
         )}
         {tab === "scoring" && <AdminScoring templates={templates} />}
         {tab === "leagues" && <AdminLeagues leagues={leagues} templateNameById={templateNameById} />}
-        {tab === "marketing" && <AdminMarketing signups={notifySignups} />}
         {tab === "analytics" && <AdminAnalytics data={analytics} />}
         {tab === "unsubscribed" && <AdminSuppressedEmails emails={suppressedEmails} />}
       </div>
