@@ -84,7 +84,7 @@ export function AdminShell({
       </div>
 
       <div className="px-4 sm:px-8 py-6 pb-16">
-        {tab === "users" && <AdminUsers users={users} />}
+        {tab === "users" && <AdminUsers users={users} templateNameById={templateNameById} />}
         {tab === "templates" && (
           <AdminTemplates templates={templates} publicLeagueByTemplate={publicLeagueByTemplate} />
         )}

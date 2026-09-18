@@ -10,7 +10,16 @@ export type AdminUserRow = {
   isAdmin: boolean;
   isBlocked: boolean;
   _count: { leagues: number };
+  memberships: {
+    role: string;
+    league: { id: string; name: string; tag: string | null; templateId: string | null };
+  }[];
 };
+
+function leagueUrl(id: string) {
+  if (typeof window === "undefined") return "#";
+  return `${window.location.protocol}//${window.location.host.replace(/^admin\./, "")}/leagues/${id}`;
+}
 
 type SortKey = "name" | "email" | "leagues" | "joined" | "status";
 type StatusFilter = "All" | "Active" | "Blocked";
@@ -31,7 +40,13 @@ function matchesLeagueFilter(count: number, filter: LeagueFilter) {
   return count >= 4;
 }
 
-export function AdminUsers({ users: initialUsers }: { users: AdminUserRow[] }) {
+export function AdminUsers({
+  users: initialUsers,
+  templateNameById,
+}: {
+  users: AdminUserRow[];
+  templateNameById: Record<string, string>;
+}) {
   const router = useRouter();
   const [users, setUsers] = useState(initialUsers);
   const [query, setQuery] = useState("");
@@ -43,6 +58,8 @@ export function AdminUsers({ users: initialUsers }: { users: AdminUserRow[] }) {
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const detailUser = users.find((u) => u.id === detailUserId) ?? null;
 
   const stats = useMemo(
     () => ({
@@ -243,7 +260,9 @@ export function AdminUsers({ users: initialUsers }: { users: AdminUserRow[] }) {
           {filtered.map((u) => (
             <div
               key={u.id}
-              className="grid grid-cols-[1.1fr_1.5fr_0.7fr_0.9fr_0.8fr_1.2fr] gap-3.5 items-center px-[18px] py-3.5 border-b border-[#EDEFF3] last:border-0"
+              onClick={() => setDetailUserId(u.id)}
+              title="Click for details"
+              className="grid grid-cols-[1.1fr_1.5fr_0.7fr_0.9fr_0.8fr_1.2fr] gap-3.5 items-center px-[18px] py-3.5 border-b border-[#EDEFF3] last:border-0 cursor-pointer hover:bg-[#F8F9FB] transition"
             >
               <span
                 className={`text-sm font-semibold truncate flex items-center gap-2 ${
@@ -273,7 +292,7 @@ export function AdminUsers({ users: initialUsers }: { users: AdminUserRow[] }) {
                   </span>
                 )}
               </span>
-              <div className="flex items-center gap-2 relative">
+              <div className="flex items-center gap-2 relative" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => handleResetPassword(u.id)}
                   disabled={busyId === u.id}
@@ -316,6 +335,89 @@ export function AdminUsers({ users: initialUsers }: { users: AdminUserRow[] }) {
             <div className="px-5 py-12 text-center text-sm text-[#6B7280]">No accounts match that search or filter.</div>
           )}
         </div>
+      </div>
+
+      {detailUser && (
+        <UserDetailModal user={detailUser} templateNameById={templateNameById} onClose={() => setDetailUserId(null)} />
+      )}
+    </div>
+  );
+}
+
+function UserDetailModal({
+  user,
+  templateNameById,
+  onClose,
+}: {
+  user: AdminUserRow;
+  templateNameById: Record<string, string>;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-white border border-[#E2E4E9] rounded-lg p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-0.5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-display text-xl tracking-wide truncate">{user.name}</h2>
+              {user.isAdmin && (
+                <span className="flex-none text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-purple/10 text-purple">
+                  ADMIN
+                </span>
+              )}
+              {user.isBlocked && (
+                <span className="flex-none text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-[#FDF2F4] text-[#C2314E]">
+                  BLOCKED
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-[#5B6270] mt-0.5 truncate">{user.email}</p>
+          </div>
+          <button onClick={onClose} className="flex-none text-[#8A909B] hover:text-[#16181D] text-2xl leading-none">
+            &times;
+          </button>
+        </div>
+        <p className="text-xs text-[#8A909B] mb-5">
+          Joined {user.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </p>
+
+        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">
+          LEAGUES ({user.memberships.length})
+        </div>
+        {user.memberships.length === 0 ? (
+          <p className="text-sm text-[#6B7280]">Not in any leagues.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {user.memberships.map((m) => (
+              <a
+                key={m.league.id}
+                href={leagueUrl(m.league.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open this league's overview page"
+                className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-md border border-[#E2E4E9] hover:border-purple transition"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-[#16181D] truncate">{m.league.name}</div>
+                  <div className="text-xs text-[#8A909B] truncate">
+                    {m.league.templateId ? templateNameById[m.league.templateId] ?? "Unknown template" : "Custom league"}
+                    {m.league.tag ? ` · ${m.league.tag}` : ""}
+                  </div>
+                </div>
+                <span
+                  className={`flex-none text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
+                    m.role === "OWNER" ? "bg-[#F1E9FE] text-[#5B1FBF]" : "bg-[#F1F2F5] text-[#5B6270]"
+                  }`}
+                >
+                  {m.role === "OWNER" ? "COMMISSIONER" : "MEMBER"}
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
