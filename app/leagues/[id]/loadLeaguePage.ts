@@ -13,7 +13,12 @@ export async function loadLeaguePage(id: string) {
     include: {
       rules: { orderBy: { order: "asc" } },
       members: {
-        include: { user: { select: { name: true } }, weeklyPicks: true, categoryPicks: true },
+        include: {
+          user: { select: { name: true } },
+          weeklyPicks: true,
+          categoryPicks: true,
+          adjustments: { orderBy: { createdAt: "asc" } },
+        },
         orderBy: { joinedAt: "asc" },
       },
       template: { include: { weeklyScores: true, ruleAwards: { include: { rule: true } } } },

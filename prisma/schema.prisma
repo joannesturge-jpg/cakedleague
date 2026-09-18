@@ -237,10 +237,31 @@ model LeagueMember {
   picks         LeagueMemberPick[]
   weeklyPicks   LeagueMemberWeeklyPick[]
   categoryPicks LeagueMemberCategoryPick[]
+  adjustments   LeagueMemberAdjustment[]
 
   @@unique([leagueId, userId])
   @@index([leagueId])
   @@index([userId])
+}
+
+// A commissioner's manual tweak to one member's score — on top of
+// whatever the scoring engine computes, so it survives future scoring
+// changes (re-entered contestant scores, rule edits) without needing to
+// be redone. "amount" is what the commissioner typed in; "points" is the
+// signed delta actually applied to the total (amount as-is for ADD,
+// negated for SUBTRACT, or the gap needed to land on "amount" for SET).
+model LeagueMemberAdjustment {
+  id        String   @id @default(cuid())
+  mode      String
+  amount    Int
+  points    Int
+  note      String
+  createdAt DateTime @default(now())
+
+  member   LeagueMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId String
+
+  @@index([memberId])
 }
 
 // Which contestant a member drafted, within one league. First-come,

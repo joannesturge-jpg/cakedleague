@@ -21,6 +21,7 @@ import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
 import { breakdownDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
 import { ScoreBreakdownModal } from "./ScoreBreakdownModal";
+import { AdjustScoreModal, type AdjustMode } from "./AdjustScoreModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean };
 type WeeklyPick = {
@@ -37,6 +38,7 @@ type CategoryPick = {
   technicalPick: string | null;
   votedOffPick: string | null;
 };
+type Adjustment = { id: string; mode: string; amount: number; points: number; note: string };
 type Member = {
   id: string;
   userId: string;
@@ -46,6 +48,7 @@ type Member = {
   finalFourPicks: string[];
   weeklyPicks: WeeklyPick[];
   categoryPicks: CategoryPick[];
+  adjustments: Adjustment[];
   user: { name: string };
 };
 type Pick = { id: string; contestant: string; memberId: string };
@@ -636,7 +639,7 @@ export function LeaguePageClient({
 
       {tab === "rankings" &&
         (league.template?.pickFormat === "WEEKLY_TOP3" ? (
-          <DwtsLeaderboard league={league} currentUserId={currentUserId} />
+          <DwtsLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
         ) : (
           <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />
         ))}
@@ -1577,9 +1580,18 @@ function SubmissionsTab({
   );
 }
 
-function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUserId: string }) {
+function DwtsLeaderboard({
+  league,
+  currentUserId,
+  isOwner,
+}: {
+  league: League;
+  currentUserId: string;
+  isOwner: boolean;
+}) {
   const template = league.template;
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<{ memberId: string; mode: AdjustMode } | null>(null);
   if (!template) return null;
 
   const hasAnyResults =
@@ -1602,6 +1614,7 @@ function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUse
         actualFinalFour: template.actualFinalFour,
         eliminatedContestants: template.eliminatedContestants,
         rules: league.rules,
+        adjustments: m.adjustments.map((a) => ({ points: a.points, note: a.note })),
       });
       return { member: m, groups, points: groups.reduce((sum, g) => sum + g.total, 0) };
     })
@@ -1612,6 +1625,7 @@ function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUse
   }
 
   const selected = standings.find((s) => s.member.id === selectedMemberId);
+  const adjusting = standings.find((s) => s.member.id === adjustTarget?.memberId);
 
   const scoredWeeks = Array.from(new Set(template.weeklyScores.map((s) => s.week))).sort((a, b) => a - b);
 
@@ -1669,6 +1683,34 @@ function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUse
               >
                 {row.points}
               </button>
+              {isOwner && (
+                <div className="flex items-center gap-1 flex-none">
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "ADD" })}
+                    title="Add points"
+                    aria-label={`Add points to ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SUBTRACT" })}
+                    title="Subtract points"
+                    aria-label={`Subtract points from ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SET" })}
+                    title="Set total score"
+                    aria-label={`Set ${row.member.user.name}'s total score`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    =
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1680,6 +1722,17 @@ function DwtsLeaderboard({ league, currentUserId }: { league: League; currentUse
           totalPoints={selected.points}
           groups={selected.groups}
           onClose={() => setSelectedMemberId(null)}
+        />
+      )}
+
+      {adjustTarget && adjusting && (
+        <AdjustScoreModal
+          leagueId={league.id}
+          memberId={adjusting.member.id}
+          memberName={adjusting.member.user.name}
+          mode={adjustTarget.mode}
+          currentTotal={adjusting.points}
+          onClose={() => setAdjustTarget(null)}
         />
       )}
     </div>

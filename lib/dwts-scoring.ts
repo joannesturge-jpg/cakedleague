@@ -20,6 +20,7 @@ export type DwtsWeeklyScoreEntry = { week: number; contestant: string; score: nu
 export type DwtsWeeklyPick = { week: number; topThree: string[]; songPrediction?: string | null; songCorrect?: boolean };
 export type DwtsRule = { label: string; points: number };
 export type DwtsRuleAward = { week: number; contestant: string; ruleLabel: string };
+export type DwtsAdjustment = { points: number; note: string };
 
 function pointsForLabel(rules: DwtsRule[], pattern: RegExp, fallback: number) {
   const match = rules.find((r) => pattern.test(r.label));
@@ -94,6 +95,7 @@ export function breakdownDwtsMember(params: {
   actualFinalFour: string[];
   eliminatedContestants: string[];
   rules: DwtsRule[];
+  adjustments?: DwtsAdjustment[];
 }): DwtsScoreGroup[] {
   const {
     winnerPick,
@@ -105,6 +107,7 @@ export function breakdownDwtsMember(params: {
     actualFinalFour,
     eliminatedContestants,
     rules,
+    adjustments = [],
   } = params;
 
   const groups: DwtsScoreGroup[] = [];
@@ -180,6 +183,15 @@ export function breakdownDwtsMember(params: {
         lines,
       });
     }
+  }
+
+  if (adjustments.length > 0) {
+    groups.push({
+      key: "adjustments",
+      title: "Commissioner Adjustments",
+      total: adjustments.reduce((s, a) => s + a.points, 0),
+      lines: adjustments.map((a) => ({ label: a.note, points: a.points })),
+    });
   }
 
   return groups;
