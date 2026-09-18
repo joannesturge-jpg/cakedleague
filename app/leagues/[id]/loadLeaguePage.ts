@@ -11,7 +11,7 @@ export async function loadLeaguePage(id: string) {
   const league = await prisma.league.findUnique({
     where: { id },
     include: {
-      rules: { orderBy: { order: "asc" } },
+      rules: { orderBy: { order: "asc" }, include: { awards: { select: { memberId: true } } } },
       members: {
         include: {
           user: { select: { name: true } },

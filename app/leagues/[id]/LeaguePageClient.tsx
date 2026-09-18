@@ -23,7 +23,7 @@ import { breakdownDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
 import { ScoreBreakdownModal } from "./ScoreBreakdownModal";
 import { AdjustScoreModal, type AdjustMode } from "./AdjustScoreModal";
 
-type Rule = { id: string; label: string; points: number; isCustom: boolean };
+type Rule = { id: string; label: string; points: number; isCustom: boolean; awards: { memberId: string }[] };
 type WeeklyPick = {
   id: string;
   week: number;
@@ -640,12 +640,17 @@ export function LeaguePageClient({
       {tab === "rankings" &&
         (league.template?.pickFormat === "WEEKLY_TOP3" ? (
           <DwtsLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
+        ) : hasCustomRules ? (
+          <CustomRuleLeaderboard league={league} currentUserId={currentUserId} />
         ) : (
           <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />
         ))}
-      {tab === "scoring" && (
-        <ComingSoon title="ENTER RESULTS" text="Score entry for commissioners is coming soon." badge="ADMIN" />
-      )}
+      {tab === "scoring" &&
+        (isOwner && hasCustomRules ? (
+          <CustomRuleScoring leagueId={league.id} rules={league.rules} members={league.members} />
+        ) : (
+          <ComingSoon title="ENTER RESULTS" text="Score entry for commissioners is coming soon." badge="ADMIN" />
+        ))}
     </div>
   );
 }
@@ -1734,6 +1739,177 @@ function DwtsLeaderboard({
           currentTotal={adjusting.points}
           onClose={() => setAdjustTarget(null)}
         />
+      )}
+    </div>
+  );
+}
+
+// Custom leagues (no DWTS-style scoring engine) earn all of their points
+// through commissioner-awarded custom rules — a member's total is just
+// the sum of whichever custom rules they've been checked off for.
+function CustomRuleLeaderboard({ league, currentUserId }: { league: League; currentUserId: string }) {
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const customRules = league.rules.filter((r) => r.isCustom);
+
+  const standings = league.members
+    .map((m) => {
+      const lines = customRules
+        .filter((r) => r.awards.some((a) => a.memberId === m.id))
+        .map((r) => ({ label: r.label, points: r.points }));
+      const points = lines.reduce((sum, l) => sum + l.points, 0);
+      const groups = lines.length > 0 ? [{ key: "custom-rules", title: "Custom Rules", total: points, lines }] : [];
+      return { member: m, groups, points };
+    })
+    .sort((a, b) => b.points - a.points);
+
+  const hasAnyResults = standings.some((s) => s.groups.length > 0);
+  if (!hasAnyResults) {
+    return <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />;
+  }
+
+  const selected = standings.find((s) => s.member.id === selectedMemberId);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="bg-card border border-cream/10 rounded-3xl p-2">
+        {standings.map((row, i) => {
+          const isMe = row.member.userId === currentUserId;
+          return (
+            <div
+              key={row.member.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0 ${
+                isMe ? "border border-pink" : ""
+              }`}
+              style={{ background: isMe ? "rgba(232,91,174,.12)" : i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
+            >
+              <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
+              <span
+                className="w-7 h-7 rounded-full flex-none"
+                style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+              />
+              <span className="flex-1 text-[14.5px] font-medium truncate flex items-center gap-2">
+                {row.member.user.name}
+                {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
+              </span>
+              <button
+                onClick={() => setSelectedMemberId(row.member.id)}
+                className="font-display text-lg text-pink hover:text-cream transition"
+                title="See how this score breaks down"
+              >
+                {row.points}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <ScoreBreakdownModal
+          memberName={selected.member.user.name}
+          totalPoints={selected.points}
+          groups={selected.groups}
+          onClose={() => setSelectedMemberId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// One card per custom rule, each with its own checklist of members and
+// its own "draft locally, then Save" state — same pattern as song
+// prediction scoring, just keyed by rule instead of by week.
+function CustomRuleScoring({ leagueId, rules, members }: { leagueId: string; rules: Rule[]; members: Member[] }) {
+  const customRules = rules.filter((r) => r.isCustom);
+  if (customRules.length === 0) {
+    return <ComingSoon title="ENTER RESULTS" text="Add a custom rule from the Details tab, then come back here to score it." />;
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {customRules.map((rule) => (
+        <RuleScoringCard key={rule.id} leagueId={leagueId} rule={rule} members={members} />
+      ))}
+    </div>
+  );
+}
+
+function RuleScoringCard({ leagueId, rule, members }: { leagueId: string; rule: Rule; members: Member[] }) {
+  const router = useRouter();
+  const savedAwarded = new Set(rule.awards.map((a) => a.memberId));
+
+  const [draft, setDraft] = useState<Record<string, boolean>>({});
+  const [syncedKey, setSyncedKey] = useState("");
+  const savedKey = `${rule.id}:${Array.from(savedAwarded).sort().join(",")}`;
+  if (savedKey !== syncedKey) {
+    setSyncedKey(savedKey);
+    setDraft({});
+  }
+
+  function isChecked(memberId: string) {
+    return draft[memberId] ?? savedAwarded.has(memberId);
+  }
+  function toggle(memberId: string) {
+    setDraft((prev) => ({ ...prev, [memberId]: !isChecked(memberId) }));
+  }
+
+  const pendingChanges = members.filter((m) => isChecked(m.id) !== savedAwarded.has(m.id));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      const memberIds = members.filter((m) => isChecked(m.id)).map((m) => m.id);
+      const res = await fetch(`/api/leagues/${leagueId}/rules/${rule.id}/awards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberIds }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Couldn't save this");
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save this");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-card border border-cream/10 rounded-3xl p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="font-display text-lg tracking-wide">{rule.label.toUpperCase()}</h3>
+        <span className={`font-display text-base ${rule.points >= 0 ? "text-pink" : "text-pink/70"}`}>
+          {rule.points > 0 ? `+${rule.points}` : rule.points}
+        </span>
+      </div>
+      <div className="flex flex-col gap-0.5 mb-4">
+        {members.map((m) => (
+          <label
+            key={m.id}
+            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-cream/[0.04] transition cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              checked={isChecked(m.id)}
+              onChange={() => toggle(m.id)}
+              className="w-[18px] h-[18px] accent-pink flex-none"
+            />
+            <span className="text-sm">{m.user.name}</span>
+          </label>
+        ))}
+      </div>
+      {error && <p className="text-sm text-[#ff8fa8] mb-2.5">{error}</p>}
+      {pendingChanges.length > 0 && (
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-full bg-pink text-ink text-sm font-bold disabled:opacity-40 transition"
+        >
+          {saving ? "Saving…" : `Save (${pendingChanges.length})`}
+        </button>
       )}
     </div>
   );

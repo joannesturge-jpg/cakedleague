@@ -211,8 +211,27 @@ model LeagueRule {
 
   league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   leagueId String
+  awards   LeagueMemberRuleAward[]
 
   @@index([leagueId])
+}
+
+// A commissioner marking "this member earned this custom rule" on the
+// league's Scoring tab — existence of a row is the award itself, no
+// separate points field since that's already on the rule. Only custom
+// rules are scored this way; template-driven pick formats (like DWTS)
+// have their own scoring engine instead.
+model LeagueMemberRuleAward {
+  id String @id @default(cuid())
+
+  rule     LeagueRule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  ruleId   String
+  member   LeagueMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId String
+
+  @@unique([ruleId, memberId])
+  @@index([ruleId])
+  @@index([memberId])
 }
 
 model LeagueMember {
@@ -238,6 +257,7 @@ model LeagueMember {
   weeklyPicks   LeagueMemberWeeklyPick[]
   categoryPicks LeagueMemberCategoryPick[]
   adjustments   LeagueMemberAdjustment[]
+  ruleAwards    LeagueMemberRuleAward[]
 
   @@unique([leagueId, userId])
   @@index([leagueId])
