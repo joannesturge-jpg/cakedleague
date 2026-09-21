@@ -2,6 +2,8 @@
 // Nothing here is stored — sessions and their duration are derived at
 // query time by grouping one visitor's page loads together whenever the
 // gap between them is under 30 minutes.
+import { isWeekOpen } from "./leagues";
+
 const SESSION_GAP_MS = 30 * 60 * 1000;
 
 export type PageViewRow = { visitorId: string; path: string; createdAt: Date };
@@ -53,6 +55,44 @@ export function computeSessionStats(views: PageViewRow[]) {
     totalHours: totalMs / (1000 * 60 * 60),
     avgMinutesPerVisitor: uniqueVisitors ? totalMs / (1000 * 60) / uniqueVisitors : 0,
   };
+}
+
+export type DwtsSubmissionLeague = {
+  templateId: string | null;
+  dueDay: string;
+  dueTime: string;
+  timezone: string;
+  startDate: Date | null;
+  weeks: number | null;
+  members: { weeklyPicks: { week: number; topThree: string[] }[] }[];
+};
+
+// For each week that's opened in at least one DWTS-format (WEEKLY_TOP3)
+// league, how many of the members eligible to pick that week — their
+// league's window for it has actually opened — have a submitted top
+// three. A league whose week N hasn't opened yet doesn't count its
+// members in that week's denominator; not eligible yet isn't the same
+// as having skipped it.
+export function computeDwtsPickSubmission(leagues: DwtsSubmissionLeague[], now: Date = new Date()) {
+  const maxWeek = leagues.reduce((max, l) => Math.max(max, l.weeks ?? 11), 0);
+  const result: { week: number; submitted: number; eligible: number; percent: number }[] = [];
+
+  for (let week = 1; week <= maxWeek; week++) {
+    let submitted = 0;
+    let eligible = 0;
+    for (const league of leagues) {
+      if (week > (league.weeks ?? 11)) continue;
+      if (!isWeekOpen(week, league.templateId, league.dueDay, league.dueTime, league.timezone, league.startDate, now)) continue;
+      for (const m of league.members) {
+        eligible++;
+        const pick = m.weeklyPicks.find((p) => p.week === week);
+        if (pick && pick.topThree.length > 0) submitted++;
+      }
+    }
+    if (eligible > 0) result.push({ week, submitted, eligible, percent: (submitted / eligible) * 100 });
+  }
+
+  return result;
 }
 
 export function computePageTraffic(views: PageViewRow[], limit = 15) {

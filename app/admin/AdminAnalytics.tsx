@@ -20,8 +20,7 @@ export type AdminAnalyticsData = {
   privateLeagues: number;
   avgMembersPerLeague: number;
   topTemplates: { name: string; count: number }[];
-  weeklyTop3MemberCount: number;
-  weeklyPicksSubmitted: number;
+  dwtsWeeklySubmission: { week: number; submitted: number; eligible: number; percent: number }[];
   trafficWindowDays: number;
   dailyVisitors: { date: string; visitors: number }[];
   totalVisitors: number;
@@ -152,15 +151,32 @@ export function AdminAnalytics({ data }: { data: AdminAnalyticsData }) {
         </div>
 
         <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
-          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-3">DWTS WEEKLY ENGAGEMENT</div>
-          <p className="text-sm text-[#5B6270] mb-1">
-            {data.weeklyTop3MemberCount === 0
-              ? "No WEEKLY_TOP3 (DWTS-style) league members yet."
-              : `${data.weeklyPicksSubmitted} weekly picks submitted across ${data.weeklyTop3MemberCount} members`}
-          </p>
-          <p className="text-xs text-[#8A909B]">
-            Total submissions ÷ total DWTS-format members — a rough gauge of how often people are coming back to
-            submit picks, not a per-week percentage (weeks don&apos;t have a stored start date yet to divide by).
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-3">
+            DWTS PICK SUBMISSIONS BY WEEK
+          </div>
+          {data.dwtsWeeklySubmission.length === 0 ? (
+            <p className="text-sm text-[#8A909B]">No DWTS-format weeks have opened yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {data.dwtsWeeklySubmission.map((w) => (
+                <div key={w.week} className="flex items-center gap-2.5">
+                  <span className="w-14 text-xs font-semibold text-[#8A909B] flex-none">Week {w.week}</span>
+                  <div className="flex-1 h-4 rounded bg-[#F4F5F7] overflow-hidden">
+                    <div
+                      className="h-full rounded"
+                      style={{ width: `${w.percent}%`, background: "#7B2CF5", minWidth: w.submitted > 0 ? "3px" : 0 }}
+                    />
+                  </div>
+                  <span className="w-24 text-xs font-semibold text-[#16181D] text-right flex-none">
+                    {w.submitted}/{w.eligible} ({Math.round(w.percent)}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-[#8A909B] mt-3">
+            Counts members whose league has that week&apos;s picks open (or past due) — a week no league has reached
+            yet doesn&apos;t drag the percentage down.
           </p>
         </div>
       </div>

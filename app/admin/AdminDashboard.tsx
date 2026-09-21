@@ -6,7 +6,7 @@ import { AdminLogin } from "./AdminLogin";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { AdminShell } from "./AdminShell";
 import type { AdminAnalyticsData } from "./AdminAnalytics";
-import { computeDailyVisitors, computeSessionStats, computePageTraffic } from "@/lib/analytics";
+import { computeDailyVisitors, computeSessionStats, computePageTraffic, computeDwtsPickSubmission } from "@/lib/analytics";
 
 const TRAFFIC_WINDOW_DAYS = 30;
 
@@ -64,8 +64,7 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
     usersActivated,
     usersWhoJoinedOthers,
     memberJoins,
-    weeklyTop3MemberCount,
-    weeklyPicksSubmitted,
+    dwtsLeagues,
     pageViews,
   ] = await Promise.all([
     prisma.user.findMany({
@@ -122,9 +121,17 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
     prisma.user.count({ where: { memberships: { some: {} } } }),
     prisma.user.count({ where: { memberships: { some: { role: { not: "OWNER" } } } } }),
     prisma.leagueMember.findMany({ select: { joinedAt: true } }),
-    prisma.leagueMember.count({ where: { league: { deletedAt: null, template: { pickFormat: "WEEKLY_TOP3" } } } }),
-    prisma.leagueMemberWeeklyPick.count({
-      where: { member: { league: { deletedAt: null, template: { pickFormat: "WEEKLY_TOP3" } } } },
+    prisma.league.findMany({
+      where: { deletedAt: null, isActive: true, template: { pickFormat: "WEEKLY_TOP3" } },
+      select: {
+        templateId: true,
+        dueDay: true,
+        dueTime: true,
+        timezone: true,
+        startDate: true,
+        weeks: true,
+        members: { select: { weeklyPicks: { select: { week: true, topThree: true } } } },
+      },
     }),
     prisma.pageView.findMany({
       where: { createdAt: { gte: new Date(Date.now() - TRAFFIC_WINDOW_DAYS * 24 * 60 * 60 * 1000) } },
@@ -161,6 +168,7 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
   const dailyVisitors = computeDailyVisitors(pageViews, TRAFFIC_WINDOW_DAYS);
   const sessionStats = computeSessionStats(pageViews);
   const pageTraffic = computePageTraffic(pageViews);
+  const dwtsWeeklySubmission = computeDwtsPickSubmission(dwtsLeagues);
 
   const analytics: AdminAnalyticsData = {
     totalUsers: users.length,
@@ -184,8 +192,7 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
     privateLeagues: nonDeletedLeagues.filter((l) => l.visibility === "PRIVATE").length,
     avgMembersPerLeague: nonDeletedLeagues.length ? totalMembers / nonDeletedLeagues.length : 0,
     topTemplates,
-    weeklyTop3MemberCount,
-    weeklyPicksSubmitted,
+    dwtsWeeklySubmission,
     trafficWindowDays: TRAFFIC_WINDOW_DAYS,
     dailyVisitors,
     totalVisitors: sessionStats.uniqueVisitors,
