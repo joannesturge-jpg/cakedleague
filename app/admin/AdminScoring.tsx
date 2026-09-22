@@ -917,6 +917,9 @@ function SeasonPredictionsAnswerKey({
   const [pickedWinner, setPickedWinner] = useState<string | null>(null);
   const finalFourLocked = template.actualFinalFour.length > 0;
   const winnerLocked = !!template.actualWinner;
+  // Survivor has no separate season-winner pick — just the pre-season
+  // top four — so there's nothing to enter an answer key for here.
+  const isSurvivor = template.tag === "SRVR";
 
   function toggle(c: string) {
     setPicking((prev) =>
@@ -930,8 +933,9 @@ function SeasonPredictionsAnswerKey({
         SEASON PREDICTIONS — ANSWER KEY
       </div>
       <p className="text-xs text-[#8A909B] mb-3">
-        Each of these can only be set once — pick them whenever the real result is known. Members predicted the
-        final four for +5 points each and the season winner once, before week one.
+        {isSurvivor
+          ? "Can only be set once — pick it whenever the real result is known. Members predicted their top four for +5 points each, before week one."
+          : "Each of these can only be set once — pick them whenever the real result is known. Members predicted the final four for +5 points each and the season winner once, before week one."}
       </p>
 
       <div className="mb-4">
@@ -981,43 +985,45 @@ function SeasonPredictionsAnswerKey({
         )}
       </div>
 
-      <div>
-        <div className="text-[13px] font-semibold text-[#16181D] mb-2">Actual season winner</div>
-        {winnerLocked ? (
-          <span className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold bg-[#EEF8F1] border border-[#1E7B45]/40 text-[#1E7B45] inline-block">
-            ✓ {template.actualWinner}
-          </span>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-1.5 mb-2.5">
-              {template.contestants.map((c) => {
-                const selected = pickedWinner === c;
-                return (
-                  <button
-                    key={c}
-                    onClick={() => setPickedWinner(c)}
-                    className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
-                      selected
-                        ? "bg-purple/10 border-purple text-purple"
-                        : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
-                    }`}
-                  >
-                    {selected ? "✓ " : ""}
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => pickedWinner && onSaveActualResults({ actualWinner: pickedWinner })}
-              disabled={!pickedWinner || busyKey === "actual:winner"}
-              className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
-            >
-              {busyKey === "actual:winner" ? "Locking in…" : "Lock in season winner"}
-            </button>
-          </>
-        )}
-      </div>
+      {!isSurvivor && (
+        <div>
+          <div className="text-[13px] font-semibold text-[#16181D] mb-2">Actual season winner</div>
+          {winnerLocked ? (
+            <span className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold bg-[#EEF8F1] border border-[#1E7B45]/40 text-[#1E7B45] inline-block">
+              ✓ {template.actualWinner}
+            </span>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {template.contestants.map((c) => {
+                  const selected = pickedWinner === c;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => setPickedWinner(c)}
+                      className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                        selected
+                          ? "bg-purple/10 border-purple text-purple"
+                          : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => pickedWinner && onSaveActualResults({ actualWinner: pickedWinner })}
+                disabled={!pickedWinner || busyKey === "actual:winner"}
+                className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+              >
+                {busyKey === "actual:winner" ? "Locking in…" : "Lock in season winner"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

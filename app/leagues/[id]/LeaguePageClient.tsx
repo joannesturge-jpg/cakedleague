@@ -7,6 +7,7 @@ import {
   formatNextDueDate,
   formatOpenDate,
   isSeasonPredictionsLocked,
+  isSurvivorTopFourLocked,
   isWeekOpen,
   weekOpenInstant,
   isWeekDuePassed,
@@ -20,6 +21,7 @@ import {
 import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
 import { breakdownDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
+import { breakdownSurvivorMember } from "@/lib/survivor-scoring";
 import { ScoreBreakdownModal } from "./ScoreBreakdownModal";
 import { AdjustScoreModal, type AdjustMode } from "./AdjustScoreModal";
 
@@ -55,6 +57,7 @@ type Pick = { id: string; contestant: string; memberId: string };
 type Template = {
   id: string;
   name: string;
+  tag: string | null;
   contestants: string[];
   eliminatedContestants: string[];
   draftOpenDay: string | null;
@@ -64,7 +67,7 @@ type Template = {
   actualWinner: string | null;
   actualFinalFour: string[];
   weeklyScores: { week: number; contestant: string; score: number }[];
-  ruleAwards: { week: number; contestant: string; rule: { label: string } }[];
+  ruleAwards: { week: number; contestant: string; rule: { label: string; points: number } }[];
 } | null;
 type League = {
   id: string;
@@ -633,13 +636,18 @@ export function LeaguePageClient({
           isOwner={isOwner}
           isAdminPreview={isAdminPreview}
           pickFormat={league.template?.pickFormat ?? null}
+          tag={league.template?.tag ?? null}
           weeklyScores={league.template?.weeklyScores ?? []}
         />
       )}
 
       {tab === "rankings" &&
         (league.template?.pickFormat === "WEEKLY_TOP3" ? (
-          <DwtsLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
+          league.template.tag === "SRVR" ? (
+            <SurvivorLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
+          ) : (
+            <DwtsLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
+          )
         ) : hasCustomRules ? (
           <CustomRuleLeaderboard league={league} currentUserId={currentUserId} />
         ) : (
@@ -895,6 +903,10 @@ function WeeklyPicksForm({
   }
 
   if (!template) return null;
+  // Survivor leagues have no separate "season winner" pick — just the
+  // pre-season top four — and no song prediction rule, so both stay
+  // hidden for them.
+  const isSurvivor = template.tag === "SRVR";
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
   const existing = weeklyPicks.find((p) => p.week === selectedWeek);
   const weekThemes = (template.weekThemes as Record<string, string> | null) ?? {};
@@ -906,122 +918,127 @@ function WeeklyPicksForm({
   const weekDueAt = weekDuePassed ? weekDueInstant(selectedWeek, dueDay, dueTime, timezone, startDateObj) : null;
   const canSave = weekOpen && !weekDuePassed && draftTop.every((c) => c) && new Set(draftTop).size === 3;
 
+  const topFourLocked = isSurvivor ? isSurvivorTopFourLocked() : isSeasonPredictionsLocked();
+
   return (
     <div className="flex flex-col gap-3">
-      {!isSeasonPredictionsLocked() && (
-        <>
-          <div className="bg-card border border-cream/10 rounded-3xl p-6">
-            <div className="flex items-center justify-between gap-3 mb-1.5">
-              <h3 className="font-display text-xl tracking-wide">SEASON WINNER</h3>
-              {!winnerEditing && (
-                <button
-                  onClick={enterWinnerEdit}
-                  className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
-                >
-                  <span aria-hidden>✎</span> Edit
-                </button>
-              )}
-            </div>
-            {!winnerEditing ? (
-              <p className="text-sm text-cream/70">
-                Your pick: <span className="text-pink font-semibold">{winnerPick}</span>
+      {!isSurvivor && !isSeasonPredictionsLocked() && (
+        <div className="bg-card border border-cream/10 rounded-3xl p-6">
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <h3 className="font-display text-xl tracking-wide">SEASON WINNER</h3>
+            {!winnerEditing && (
+              <button
+                onClick={enterWinnerEdit}
+                className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
+              >
+                <span aria-hidden>✎</span> Edit
+              </button>
+            )}
+          </div>
+          {!winnerEditing ? (
+            <p className="text-sm text-cream/70">
+              Your pick: <span className="text-pink font-semibold">{winnerPick}</span>
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-cream/55 mb-3">
+                You can change this until Sept 15 at 5:00 PM PT — after that it locks for good.
               </p>
-            ) : (
-              <>
-                <p className="text-sm text-cream/55 mb-3">
-                  You can change this until Sept 15 at 5:00 PM PT — after that it locks for good.
-                </p>
-                {winnerError && <p className="text-sm text-pink font-medium mb-2">{winnerError}</p>}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {active.map((c) => {
-                    const selected = draftWinner === c;
-                    return (
-                      <button
-                        key={c}
-                        onClick={() => setDraftWinner(c)}
-                        className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
-                          selected
-                            ? "border-pink bg-pink/15 text-pink"
-                            : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
-                        }`}
-                      >
-                        {selected ? "✓ " : ""}
-                        {c}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={saveWinner}
-                  disabled={!draftWinner || winnerBusy}
-                  className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
-                >
-                  {winnerBusy ? "Saving…" : "Save"}
-                </button>
-              </>
-            )}
-          </div>
-
-          <div className="bg-card border border-cream/10 rounded-3xl p-6">
-            <div className="flex items-center justify-between gap-3 mb-1.5">
-              <h3 className="font-display text-xl tracking-wide">FINAL FOUR PREDICTIONS</h3>
-              {!fourEditing && (
-                <button
-                  onClick={enterFourEdit}
-                  className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
-                >
-                  <span aria-hidden>✎</span> Edit
-                </button>
-              )}
-            </div>
-            {!fourEditing ? (
-              <div className="flex flex-wrap gap-1.5">
-                {finalFourPicks.map((c) => (
-                  <span
-                    key={c}
-                    className="px-3 py-2 rounded-xl text-sm font-semibold border border-pink bg-pink/15 text-pink"
-                  >
-                    {c}
-                  </span>
-                ))}
+              {winnerError && <p className="text-sm text-pink font-medium mb-2">{winnerError}</p>}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {active.map((c) => {
+                  const selected = draftWinner === c;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => setDraftWinner(c)}
+                      className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                        selected
+                          ? "border-pink bg-pink/15 text-pink"
+                          : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}
+                      {c}
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              <>
-                <p className="text-sm text-cream/55 mb-3">
-                  +5 points for every one you get right. You can change these until Sept 15 at 5:00 PM PT — after
-                  that they lock for good.
-                </p>
-                {finalFourError && <p className="text-sm text-pink font-medium mb-2">{finalFourError}</p>}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {active.map((c) => {
-                    const selected = draftFour.includes(c);
-                    return (
-                      <button
-                        key={c}
-                        onClick={() => toggleFour(c)}
-                        className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
-                          selected
-                            ? "border-pink bg-pink/15 text-pink"
-                            : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
-                        }`}
-                      >
-                        {selected ? "✓ " : ""}
-                        {c}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={saveFour}
-                  disabled={draftFour.length !== 4 || finalFourBusy}
-                  className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
-                >
-                  {finalFourBusy ? "Saving…" : `Save (${draftFour.length}/4)`}
-                </button>
-              </>
+              <button
+                onClick={saveWinner}
+                disabled={!draftWinner || winnerBusy}
+                className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+              >
+                {winnerBusy ? "Saving…" : "Save"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {!topFourLocked && (
+        <div className="bg-card border border-cream/10 rounded-3xl p-6">
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <h3 className="font-display text-xl tracking-wide">
+              {isSurvivor ? "YOUR TOP FOUR" : "FINAL FOUR PREDICTIONS"}
+            </h3>
+            {!fourEditing && (
+              <button
+                onClick={enterFourEdit}
+                className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
+              >
+                <span aria-hidden>✎</span> Edit
+              </button>
             )}
           </div>
-        </>
+          {!fourEditing ? (
+            <div className="flex flex-wrap gap-1.5">
+              {finalFourPicks.map((c) => (
+                <span
+                  key={c}
+                  className="px-3 py-2 rounded-xl text-sm font-semibold border border-pink bg-pink/15 text-pink"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-cream/55 mb-3">
+                {isSurvivor
+                  ? "+5 points for every one you get right. You can change these until Sept 30 at 5:00 PM PT — after that they lock for good."
+                  : "+5 points for every one you get right. You can change these until Sept 15 at 5:00 PM PT — after that they lock for good."}
+              </p>
+              {finalFourError && <p className="text-sm text-pink font-medium mb-2">{finalFourError}</p>}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {active.map((c) => {
+                  const selected = draftFour.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => toggleFour(c)}
+                      className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                        selected
+                          ? "border-pink bg-pink/15 text-pink"
+                          : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={saveFour}
+                disabled={draftFour.length !== 4 || finalFourBusy}
+                className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+              >
+                {finalFourBusy ? "Saving…" : `Save (${draftFour.length}/4)`}
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       <div className="bg-card border border-cream/10 rounded-3xl p-6">
@@ -1071,7 +1088,12 @@ function WeeklyPicksForm({
             onClose={() => setShowContestants(false)}
           />
         )}
-        {!weeklyEditing && existing ? (
+        {isSurvivor && selectedWeek === 1 ? (
+          <>
+            <p className="text-sm text-cream/50 mt-3">Week 1 will not be scored. Be sure to make your picks for week 2!</p>
+            <p className="text-sm text-cream/50 mt-1.5">Additional selections and points will come at the time of the merge.</p>
+          </>
+        ) : !weeklyEditing && existing ? (
           <>
             <p className="text-sm text-cream/55 mb-3 mt-3">Your picks for this week:</p>
             <ol className="flex flex-col gap-1 mb-2">
@@ -1097,7 +1119,9 @@ function WeeklyPicksForm({
           </p>
         ) : (
           <>
-            <p className="text-sm text-cream/55 mb-4">Rank your top three for this week, in order.</p>
+            <p className="text-sm text-cream/55 mb-4">
+              {isSurvivor ? "Pick three castaways to root for this week." : "Rank your top three for this week, in order."}
+            </p>
             {weeklyError && <p className="text-sm text-pink font-medium mb-3">{weeklyError}</p>}
             <div className="flex flex-col gap-2.5 mb-4">
               {[0, 1, 2].map((i) => (
@@ -1114,7 +1138,7 @@ function WeeklyPicksForm({
                     }
                     className="flex-1 px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
                   >
-                    <option value="">Choose a couple</option>
+                    <option value="">{isSurvivor ? "Choose a contestant" : "Choose a couple"}</option>
                     {active.map((c) => (
                       <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[i] !== c}>
                         {c}
@@ -1124,15 +1148,19 @@ function WeeklyPicksForm({
                 </div>
               ))}
             </div>
-            <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-2">
-              SONG PREDICTION (OPTIONAL)
-            </label>
-            <input
-              value={draftSong}
-              onChange={(e) => setDraftSong(e.target.value)}
-              placeholder="A song you think gets used this week"
-              className="w-full px-4 py-3 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition mb-4"
-            />
+            {!isSurvivor && (
+              <>
+                <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-2">
+                  SONG PREDICTION (OPTIONAL)
+                </label>
+                <input
+                  value={draftSong}
+                  onChange={(e) => setDraftSong(e.target.value)}
+                  placeholder="A song you think gets used this week"
+                  className="w-full px-4 py-3 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition mb-4"
+                />
+              </>
+            )}
             <button
               onClick={saveWeekly}
               disabled={!canSave || weekliesBusy}
@@ -1342,6 +1370,7 @@ function SubmissionsTab({
   isOwner,
   isAdminPreview,
   pickFormat,
+  tag,
   weeklyScores,
 }: {
   leagueId: string;
@@ -1351,8 +1380,10 @@ function SubmissionsTab({
   isOwner: boolean;
   isAdminPreview: boolean;
   pickFormat: string | null;
+  tag: string | null;
   weeklyScores: { week: number }[];
 }) {
+  const isSurvivor = tag === "SRVR";
   const router = useRouter();
   // Same "next unscored week" default as the pick form — once a week's
   // scored, there's no reason to land on it instead of the current one.
@@ -1369,8 +1400,13 @@ function SubmissionsTab({
   // an admin previewing a league they're not a member of has nothing to
   // submit, so that gate would otherwise make the preview useless.
   const unlocked = !!myPick || isAdminPreview;
-  const seasonPredictionsUnlocked = (!!me?.winnerPick && me.finalFourPicks.length === 4) || isAdminPreview;
-  const seasonSubmittedCount = members.filter((m) => m.winnerPick && m.finalFourPicks.length === 4).length;
+  // Survivor has no season-winner pick — just the top four — so its
+  // "submitted" check can't require winnerPick the way DWTS's does.
+  function hasSeasonPrediction(m: Member) {
+    return isSurvivor ? m.finalFourPicks.length === 4 : !!m.winnerPick && m.finalFourPicks.length === 4;
+  }
+  const seasonPredictionsUnlocked = (!!me && hasSeasonPrediction(me)) || isAdminPreview;
+  const seasonSubmittedCount = members.filter(hasSeasonPrediction).length;
 
   // Song correctness is drafted locally and only sent once "Save" is
   // pressed — clicking a chip shouldn't fire a request per click. Re-seeds
@@ -1452,10 +1488,14 @@ function SubmissionsTab({
                       <span className="text-sm font-semibold">{m.user.name}</span>
                       {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
                     </div>
-                    {m.winnerPick && m.finalFourPicks.length === 4 ? (
+                    {hasSeasonPrediction(m) ? (
                       <p className="text-xs text-cream/68 leading-snug">
-                        Winner: {celebrityName(m.winnerPick)}
-                        <br />
+                        {!isSurvivor && (
+                          <>
+                            Winner: {celebrityName(m.winnerPick!)}
+                            <br />
+                          </>
+                        )}
                         Top 4: {m.finalFourPicks.map(celebrityName).join(", ")}
                       </p>
                     ) : (
@@ -1497,7 +1537,7 @@ function SubmissionsTab({
         </div>
       ) : (
         <>
-          {pickFormat === "WEEKLY_TOP3" && (() => {
+          {pickFormat === "WEEKLY_TOP3" && !isSurvivor && (() => {
             const withSongs = members.filter((m) => m.weeklyPicks.find((p) => p.week === week)?.songPrediction);
             return (
               <div className="bg-card border border-cream/10 rounded-3xl p-6 mb-5">
@@ -1660,6 +1700,148 @@ function DwtsLeaderboard({
           )}
         </div>
       </div>
+
+      <div className="bg-card border border-cream/10 rounded-3xl p-2">
+        {standings.map((row, i) => {
+          const isMe = row.member.userId === currentUserId;
+          return (
+            <div
+              key={row.member.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0 ${
+                isMe ? "border border-pink" : ""
+              }`}
+              style={{ background: isMe ? "rgba(232,91,174,.12)" : i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
+            >
+              <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
+              <span
+                className="w-7 h-7 rounded-full flex-none"
+                style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+              />
+              <span className="flex-1 text-[14.5px] font-medium truncate flex items-center gap-2">
+                {row.member.user.name}
+                {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
+              </span>
+              <button
+                onClick={() => setSelectedMemberId(row.member.id)}
+                className="font-display text-lg text-pink hover:text-cream transition"
+                title="See how this score breaks down"
+              >
+                {row.points}
+              </button>
+              {isOwner && (
+                <div className="flex items-center gap-1 flex-none">
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "ADD" })}
+                    title="Add points"
+                    aria-label={`Add points to ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SUBTRACT" })}
+                    title="Subtract points"
+                    aria-label={`Subtract points from ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SET" })}
+                    title="Set total score"
+                    aria-label={`Set ${row.member.user.name}'s total score`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    =
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <ScoreBreakdownModal
+          memberName={selected.member.user.name}
+          totalPoints={selected.points}
+          groups={selected.groups}
+          onClose={() => setSelectedMemberId(null)}
+        />
+      )}
+
+      {adjustTarget && adjusting && (
+        <AdjustScoreModal
+          leagueId={league.id}
+          memberId={adjusting.member.id}
+          memberName={adjusting.member.user.name}
+          mode={adjustTarget.mode}
+          currentTotal={adjusting.points}
+          onClose={() => setAdjustTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Survivor-tagged (SRVR) WEEKLY_TOP3 leagues — same shape as DWTS
+// (finalFourPicks + weekly topThree) but scored via breakdownSurvivorMember
+// instead, since Survivor's rules are individual events, not a ranked
+// top three. Mirrors DwtsLeaderboard's layout and commissioner-adjustment
+// actions exactly.
+function SurvivorLeaderboard({
+  league,
+  currentUserId,
+  isOwner,
+}: {
+  league: League;
+  currentUserId: string;
+  isOwner: boolean;
+}) {
+  const template = league.template;
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<{ memberId: string; mode: AdjustMode } | null>(null);
+  if (!template) return null;
+
+  const hasAnyResults = template.ruleAwards.length > 0 || template.actualFinalFour.length > 0;
+
+  const ruleAwards = template.ruleAwards.map((a) => ({
+    week: a.week,
+    contestant: a.contestant,
+    ruleLabel: a.rule.label,
+    points: a.rule.points,
+  }));
+
+  const standings = league.members
+    .map((m) => {
+      const groups = breakdownSurvivorMember({
+        finalFourPicks: m.finalFourPicks,
+        weeklyPicks: m.weeklyPicks,
+        ruleAwards,
+        actualFinalFour: template.actualFinalFour,
+        adjustments: m.adjustments.map((a) => ({ points: a.points, note: a.note })),
+      });
+      return { member: m, groups, points: groups.reduce((sum, g) => sum + g.total, 0) };
+    })
+    .sort((a, b) => b.points - a.points);
+
+  if (!hasAnyResults) {
+    return <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />;
+  }
+
+  const selected = standings.find((s) => s.member.id === selectedMemberId);
+  const adjusting = standings.find((s) => s.member.id === adjustTarget?.memberId);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {template.actualFinalFour.length > 0 && (
+        <div className="bg-card border border-cream/10 rounded-3xl p-6">
+          <h3 className="font-display text-lg tracking-wide mb-3">RESULTS SO FAR</h3>
+          <p className="text-sm text-cream/70">
+            <span className="text-cream/45">Final four:</span> {template.actualFinalFour.join(", ")}
+          </p>
+        </div>
+      )}
 
       <div className="bg-card border border-cream/10 rounded-3xl p-2">
         {standings.map((row, i) => {

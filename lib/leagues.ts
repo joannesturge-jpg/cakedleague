@@ -297,3 +297,12 @@ export const SEASON_PREDICTIONS_LOCK_AT = "2026-09-16T00:00:00.000Z";
 export function isSeasonPredictionsLocked() {
   return Date.now() >= new Date(SEASON_PREDICTIONS_LOCK_AT).getTime();
 }
+
+// Same idea, but for Survivor's pre-season top-four pick: 5:00 PM Pacific
+// on Sept 30, 2026 — a different one-time cutoff from DWTS's, so it can't
+// share SEASON_PREDICTIONS_LOCK_AT.
+export const SURVIVOR_TOP_FOUR_LOCK_AT = "2026-10-01T00:00:00.000Z";
+
+export function isSurvivorTopFourLocked() {
+  return Date.now() >= new Date(SURVIVOR_TOP_FOUR_LOCK_AT).getTime();
+}
