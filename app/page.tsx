@@ -164,6 +164,15 @@ export default async function HomePage() {
                 </Link>
               ))}
             </div>
+
+            <div className="text-center mt-10">
+              <Link
+                href="/leagues/new"
+                className="inline-block px-8 py-4 rounded-full bg-purple text-cream font-bold text-base hover:bg-[#8f47ff] transition shadow-[0_12px_34px_rgba(123,44,245,.42)]"
+              >
+                Create a league
+              </Link>
+            </div>
           </div>
         </section>
       )}
