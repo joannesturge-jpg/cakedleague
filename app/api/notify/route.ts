@@ -10,7 +10,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
   }
 
-  const template = await prisma.leagueTemplate.findFirst({ where: { id: templateId, isActive: true } });
+  // Not filtered to isActive — an inactive ("coming soon") template still
+  // needs to accept notify signups, since that's the whole point of
+  // listing it as coming soon.
+  const template = await prisma.leagueTemplate.findFirst({ where: { id: templateId } });
   if (!template) {
     return NextResponse.json({ error: "Pick a show to be notified about" }, { status: 400 });
   }

@@ -26,8 +26,10 @@ export default async function PublicLeaguesPage() {
       },
       orderBy: { createdAt: "asc" },
     }),
+    // Not filtered to isActive: an inactive ("coming soon") template
+    // should still show up here with a notify option, even though it's
+    // excluded from the create-league wizard until it's ready.
     prisma.leagueTemplate.findMany({
-      where: { isActive: true },
       orderBy: { createdAt: "asc" },
       select: { id: true, name: true, glyph: true },
     }),
