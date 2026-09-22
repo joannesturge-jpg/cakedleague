@@ -1060,7 +1060,7 @@ function WeeklyPicksForm({
               ))}
             </select>
           </div>
-          {weeklyEditing && weekOpen && !weekDuePassed ? (
+          {!isSurvivor && weeklyEditing && weekOpen && !weekDuePassed ? (
             <button
               onClick={() => setShowContestants(true)}
               className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
@@ -1079,7 +1079,10 @@ function WeeklyPicksForm({
             )
           )}
         </div>
-        {showContestants && (
+        {/* ContestantsModal is hardcoded to DWTS's cast photos (DWTS_CAST)
+            — it doesn't generically render whatever `contestants` list is
+            passed in, so it can't be reused for Survivor's real cast. */}
+        {!isSurvivor && showContestants && (
           <ContestantsModal
             contestants={template.contestants}
             eliminatedContestants={template.eliminatedContestants}
