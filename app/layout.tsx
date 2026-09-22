@@ -80,6 +80,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             >
               Share feedback
             </Link>
+            <Link
+              href="/leagues/new"
+              className="px-4 py-2 rounded-full text-sm font-bold text-ink bg-pink hover:bg-cream transition whitespace-nowrap"
+            >
+              Create a league
+            </Link>
           </nav>
 
           <div className="hidden sm:flex items-center gap-2.5 flex-none">
