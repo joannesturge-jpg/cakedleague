@@ -380,6 +380,13 @@ function WeeklyTop3Scoring({
   ) => void;
   onSaveWeekTheme: (week: number, theme: string) => void;
 }) {
+  // Survivor's rules are all individual per-contestant events (immunity
+  // win, idol found, survives, eliminated...) — there's no "rank the
+  // week's scores to find a top three" concept the way DWTS has, so the
+  // week theme, per-couple score grid, and song predictions note (all
+  // DWTS-specific) don't apply and stay hidden.
+  const isSurvivor = template.tag === "SRVR";
+
   const scoresThisWeek = template.weeklyScores.filter((s) => s.week === week);
   const scoreOf = (c: string) => scoresThisWeek.find((s) => s.contestant === c)?.score ?? 0;
 
@@ -463,66 +470,72 @@ function WeeklyTop3Scoring({
         onSaveActualResults={onSaveActualResults}
       />
 
-      <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
-        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2">WEEK {week} THEME</div>
-        <div className="flex items-center gap-2">
-          <input
-            value={themeDraft}
-            onChange={(e) => setThemeDraft(e.target.value)}
-            placeholder="e.g. Viral Hits"
-            className="flex-1 px-3 py-2 rounded-md border border-[#D6D9E0] bg-white text-sm outline-none focus:border-purple transition"
-          />
-          <button
-            onClick={() => onSaveWeekTheme(week, themeDraft)}
-            disabled={themeDraft === savedTheme || busyKey === `theme:${week}`}
-            className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
-          >
-            {busyKey === `theme:${week}` ? "Saving…" : "Save"}
-          </button>
+      {!isSurvivor && (
+        <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2">WEEK {week} THEME</div>
+          <div className="flex items-center gap-2">
+            <input
+              value={themeDraft}
+              onChange={(e) => setThemeDraft(e.target.value)}
+              placeholder="e.g. Viral Hits"
+              className="flex-1 px-3 py-2 rounded-md border border-[#D6D9E0] bg-white text-sm outline-none focus:border-purple transition"
+            />
+            <button
+              onClick={() => onSaveWeekTheme(week, themeDraft)}
+              disabled={themeDraft === savedTheme || busyKey === `theme:${week}`}
+              className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+            >
+              {busyKey === `theme:${week}` ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
-        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SCORE EVERY COUPLE</div>
-        <p className="text-xs text-[#8A909B] mb-3">
-          Enter each couple&apos;s score for the week — the top three (ties included) are ranked automatically below.
-        </p>
-        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-          {allContestants.map((c) => {
-            const inTop3 = topThree.has(c);
-            const eliminated = template.eliminatedContestants.includes(c);
-            return (
-              <div
-                key={c}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md border ${
-                  inTop3 ? "bg-[#EEF8F1] border-[#1E7B45]/40" : "bg-[#F8F9FB] border-[#EDEFF3]"
-                }`}
-              >
-                <span className="flex-1 text-sm truncate">{c}</span>
-                {eliminated && <span className="text-[10px] font-bold text-[#C2314E]">OUT</span>}
-                {inTop3 && <span className="text-[10px] font-bold text-[#1E7B45]">TOP 3</span>}
-                <input
-                  type="number"
-                  value={draftScores[c] ?? "0"}
-                  onChange={(e) => setDraftScores((prev) => ({ ...prev, [c]: e.target.value }))}
-                  className="w-16 px-2 py-1 rounded border border-[#D6D9E0] bg-white text-sm text-center outline-none focus:border-purple transition"
-                />
-              </div>
-            );
-          })}
-          {allContestants.length === 0 && (
-            <p className="text-xs text-[#8A909B]">No contestants — add some in League Templates.</p>
-          )}
+      {!isSurvivor && (
+        <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SCORE EVERY COUPLE</div>
+          <p className="text-xs text-[#8A909B] mb-3">
+            Enter each couple&apos;s score for the week — the top three (ties included) are ranked automatically below.
+          </p>
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+            {allContestants.map((c) => {
+              const inTop3 = topThree.has(c);
+              const eliminated = template.eliminatedContestants.includes(c);
+              return (
+                <div
+                  key={c}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md border ${
+                    inTop3 ? "bg-[#EEF8F1] border-[#1E7B45]/40" : "bg-[#F8F9FB] border-[#EDEFF3]"
+                  }`}
+                >
+                  <span className="flex-1 text-sm truncate">{c}</span>
+                  {eliminated && <span className="text-[10px] font-bold text-[#C2314E]">OUT</span>}
+                  {inTop3 && <span className="text-[10px] font-bold text-[#1E7B45]">TOP 3</span>}
+                  <input
+                    type="number"
+                    value={draftScores[c] ?? "0"}
+                    onChange={(e) => setDraftScores((prev) => ({ ...prev, [c]: e.target.value }))}
+                    className="w-16 px-2 py-1 rounded border border-[#D6D9E0] bg-white text-sm text-center outline-none focus:border-purple transition"
+                  />
+                </div>
+              );
+            })}
+            {allContestants.length === 0 && (
+              <p className="text-xs text-[#8A909B]">No contestants — add some in League Templates.</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
-        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SONG PREDICTIONS</div>
-        <p className="text-sm text-[#5B6270]">
-          Not scored here — each league&apos;s commissioner checks their own members&apos; song predictions from
-          their league page.
-        </p>
-      </div>
+      {!isSurvivor && (
+        <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SONG PREDICTIONS</div>
+          <p className="text-sm text-[#5B6270]">
+            Not scored here — each league&apos;s commissioner checks their own members&apos; song predictions from
+            their league page.
+          </p>
+        </div>
+      )}
 
       {otherRules.length > 0 && (
         <RulesScoring
@@ -535,7 +548,9 @@ function WeeklyTop3Scoring({
       )}
 
       <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
-        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">COUPLE ELIMINATED</div>
+        <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">
+          {isSurvivor ? "CONTESTANT ELIMINATED" : "COUPLE ELIMINATED"}
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {template.contestants.map((c) => {
             const out = template.eliminatedContestants.includes(c);
