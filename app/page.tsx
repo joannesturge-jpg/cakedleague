@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { AdminDashboard } from "@/app/admin/AdminDashboard";
 import { FaqAccordion } from "@/app/components/FaqAccordion";
 
@@ -30,6 +31,11 @@ export default async function HomePage() {
   }
 
   const user = await getCurrentUser();
+  const templates = await prisma.leagueTemplate.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, glyph: true, description: true },
+  });
 
   return (
     <div>
@@ -125,6 +131,42 @@ export default async function HomePage() {
           ))}
         </div>
       </div>
+
+      {templates.length > 0 && (
+        <section className="px-5 sm:px-10 py-14 sm:py-20">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <p className="font-script text-3xl sm:text-4xl text-pink leading-none mb-1">no waiting list</p>
+              <h2 className="font-display text-3xl sm:text-5xl tracking-wide">START ANY OF THESE TODAY</h2>
+              <p className="text-cream/60 mt-3 max-w-lg mx-auto">
+                Prebuilt scoring, real cast lists, ready to go. Every rule stays editable once your league exists.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              {templates.map((t) => (
+                <Link
+                  key={t.id}
+                  href="/leagues/new"
+                  className="group rounded-3xl overflow-hidden bg-card border border-cream/14 p-7 flex flex-col hover:border-pink/50 transition"
+                >
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl mb-4"
+                    style={{ background: "linear-gradient(140deg,#7B2CF5,#E85BAE)" }}
+                  >
+                    {t.glyph}
+                  </div>
+                  <h3 className="font-display text-2xl tracking-wide mb-1.5">{t.name.toUpperCase()}</h3>
+                  <p className="text-[14.5px] text-cream/60 leading-relaxed mb-5 flex-1">{t.description}</p>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-bold text-pink group-hover:gap-2.5 transition-all">
+                    Start a league <span aria-hidden>→</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="px-5 sm:px-10 pt-12 sm:pt-20">
         <div className="max-w-5xl mx-auto rounded-[28px] p-8 sm:p-16 text-center relative overflow-hidden bg-gradient-to-br from-purple to-pink">
