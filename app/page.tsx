@@ -147,7 +147,7 @@ export default async function HomePage() {
               {templates.map((t) => (
                 <Link
                   key={t.id}
-                  href="/leagues/new"
+                  href={`/leagues/new?template=${t.id}`}
                   className="group rounded-3xl overflow-hidden bg-card border border-cream/14 p-7 flex flex-col hover:border-pink/50 transition"
                 >
                   <div

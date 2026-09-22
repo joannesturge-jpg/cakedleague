@@ -47,7 +47,13 @@ const SCRATCH_STEPS = [
   { key: "review", label: "Review" },
 ];
 
-export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
+export function CreateLeagueWizard({
+  templates,
+  initialTemplateId,
+}: {
+  templates: Template[];
+  initialTemplateId?: string;
+}) {
   const router = useRouter();
   const [step, setStep] = useState(0);
 
@@ -58,10 +64,12 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
   const visibility = "PRIVATE" as const;
 
   // Custom ("start from scratch") leagues aren't available yet — always
-  // start on the first active template (Bake Off / DWTS).
-  const [templateId, setTemplateId] = useState<string | null>(templates[0]?.id ?? null);
+  // start on a template. Whichever one the "Start a league" card they
+  // clicked was for (if any), else the first active one.
+  const startingTemplate = templates.find((t) => t.id === initialTemplateId) ?? templates[0] ?? null;
+  const [templateId, setTemplateId] = useState<string | null>(startingTemplate?.id ?? null);
   const [rules, setRules] = useState<Rule[]>(
-    () => templates[0]?.rules.map((r) => ({ label: r.label, points: r.points, isCustom: false })) ?? []
+    () => startingTemplate?.rules.map((r) => ({ label: r.label, points: r.points, isCustom: false })) ?? []
   );
   const [ruleDraft, setRuleDraft] = useState("");
   const template = templates.find((t) => t.id === templateId) ?? null;
@@ -69,14 +77,14 @@ export function CreateLeagueWizard({ templates }: { templates: Template[] }) {
   const safeStep = Math.min(step, steps.length - 1);
   const currentKey = steps[safeStep].key;
 
-  const [weeks, setWeeks] = useState(templates[0]?.weeks ?? 8);
+  const [weeks, setWeeks] = useState(startingTemplate?.weeks ?? 8);
   const [startDate, setStartDate] = useState("");
-  const [scoringPerWeek, setScoringPerWeek] = useState(templates[0]?.scoringPerWeek ?? 1);
-  const [dueDay, setDueDay] = useState(templates[0]?.dueDay ?? "SUNDAY");
+  const [scoringPerWeek, setScoringPerWeek] = useState(startingTemplate?.scoringPerWeek ?? 1);
+  const [dueDay, setDueDay] = useState(startingTemplate?.dueDay ?? "SUNDAY");
   const [dueTime, setDueTime] = useState("20:00");
   const [timezone, setTimezone] = useState<string>(DEFAULT_TIMEZONE);
 
-  const [draftMode, setDraftMode] = useState(templates[0]?.draftMode ?? "SNAKE");
+  const [draftMode, setDraftMode] = useState(startingTemplate?.draftMode ?? "SNAKE");
   const [draftModeDescription, setDraftModeDescription] = useState("");
 
   const [entryFeeEnabled, setEntryFeeEnabled] = useState(false);

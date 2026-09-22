@@ -5,7 +5,11 @@ import { CreateLeagueWizard } from "./CreateLeagueWizard";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewLeaguePage() {
+export default async function NewLeaguePage({
+  searchParams,
+}: {
+  searchParams: { template?: string };
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
@@ -15,5 +19,5 @@ export default async function NewLeaguePage() {
     include: { rules: { orderBy: { order: "asc" } } },
   });
 
-  return <CreateLeagueWizard templates={templates} />;
+  return <CreateLeagueWizard templates={templates} initialTemplateId={searchParams.template} />;
 }
