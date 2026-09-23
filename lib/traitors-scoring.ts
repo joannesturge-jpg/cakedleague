@@ -21,8 +21,6 @@ export type TraitorsScoreGroup = { key: string; title: string; total: number; li
 const WENT_HOME_LABEL = "Went home this week (banished or murdered)";
 const SHIELD_LABEL = "Earns a shield";
 const FIRST_TO_SPEAK_LABEL = "First to speak at the Round Table";
-const VOTED_TRAITOR_LABEL = "Selected Faithful votes for a Traitor at Banishment";
-const VOTED_TRAITOR_SUCCESS_LABEL = "Selected Faithful votes for a Traitor — Banishment successful";
 
 export function breakdownTraitorsMember(params: {
   winnerPick: string | null;
@@ -68,10 +66,6 @@ export function breakdownTraitorsMember(params: {
     const wentHome = new Set(weekAwards.filter((a) => a.ruleLabel === WENT_HOME_LABEL).map((a) => a.contestant));
     const shielded = new Set(weekAwards.filter((a) => a.ruleLabel === SHIELD_LABEL).map((a) => a.contestant));
     const firstToSpeak = new Set(weekAwards.filter((a) => a.ruleLabel === FIRST_TO_SPEAK_LABEL).map((a) => a.contestant));
-    const votedTraitor = new Set(weekAwards.filter((a) => a.ruleLabel === VOTED_TRAITOR_LABEL).map((a) => a.contestant));
-    const votedTraitorSuccess = new Set(
-      weekAwards.filter((a) => a.ruleLabel === VOTED_TRAITOR_SUCCESS_LABEL).map((a) => a.contestant)
-    );
     const zeroVotes = new Set(weekScores.filter((s) => s.score === 0).map((s) => s.contestant));
 
     const [traitorPick, faithfulPick, predictedGoHome] = pick.topThree;
@@ -89,11 +83,6 @@ export function breakdownTraitorsMember(params: {
         lines.push({ label: `Selected to survive — eliminated this episode — ${faithfulPick}`, points: -5 });
       } else {
         lines.push({ label: `Selected to survive — survives the episode — ${faithfulPick}`, points: 8 });
-      }
-      if (votedTraitorSuccess.has(faithfulPick)) {
-        lines.push({ label: `Voted for a Traitor — banishment successful — ${faithfulPick}`, points: 10 });
-      } else if (votedTraitor.has(faithfulPick)) {
-        lines.push({ label: `Voted for a Traitor at banishment — ${faithfulPick}`, points: 5 });
       }
     }
     if (predictedGoHome && wentHome.has(predictedGoHome)) {

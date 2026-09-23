@@ -62,7 +62,6 @@ type Template = {
   tag: string | null;
   contestants: string[];
   eliminatedContestants: string[];
-  traitorContestants: string[];
   draftOpenDay: string | null;
   draftOpenTime: string | null;
   pickFormat: string;
@@ -918,6 +917,16 @@ function WeeklyPicksForm({
   // fixed distinct roles instead of an unordered top three.
   const isTraitors = template.tag === "TRTRS";
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
+  // Who's playing as a Traitor as of the selected week — the admin
+  // checks "Traitor as of this week" once (the season's starting
+  // traitors, or whenever someone gets recruited), and it's treated as
+  // sticky forward from that week on rather than needing re-entry every
+  // week.
+  const traitorsAsOfWeek = new Set(
+    template.ruleAwards
+      .filter((a) => a.week <= selectedWeek && a.rule.label === "Traitor as of this week")
+      .map((a) => a.contestant)
+  );
   const existing = weeklyPicks.find((p) => p.week === selectedWeek);
   const weekThemes = (template.weekThemes as Record<string, string> | null) ?? {};
   const weekTheme = (w: number) => weekThemes[String(w)] ?? "";
@@ -1220,7 +1229,7 @@ function WeeklyPicksForm({
                   >
                     <option value="">Choose a Traitor</option>
                     {active
-                      .filter((c) => template.traitorContestants.includes(c))
+                      .filter((c) => traitorsAsOfWeek.has(c))
                       .map((c) => (
                         <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[0] !== c}>
                           {c}
@@ -1245,7 +1254,7 @@ function WeeklyPicksForm({
                   >
                     <option value="">Choose a Faithful</option>
                     {active
-                      .filter((c) => !template.traitorContestants.includes(c))
+                      .filter((c) => !traitorsAsOfWeek.has(c))
                       .map((c) => (
                         <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[1] !== c}>
                           {c}

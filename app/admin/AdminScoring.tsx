@@ -21,7 +21,6 @@ export type AdminScoringTemplate = {
   weeks: number;
   contestants: string[];
   eliminatedContestants: string[];
-  traitorContestants: string[];
   pickFormat: string;
   rules: AdminScoringRule[];
   ruleAwards: AdminRuleAward[];
@@ -210,29 +209,6 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
     }
   }
 
-  async function toggleTraitor(contestant: string) {
-    if (!template) return;
-    const key = `traitor:${contestant}`;
-    setBusyKey(key);
-    setError("");
-    const next = template.traitorContestants.includes(contestant)
-      ? template.traitorContestants.filter((c) => c !== contestant)
-      : [...template.traitorContestants, contestant];
-    try {
-      const res = await fetch(`/api/admin/templates/${template.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ traitorContestants: next }),
-      });
-      if (!res.ok) throw new Error("Couldn't update that");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't update that");
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
   if (!template) {
     return (
       <div className="bg-white border border-[#E2E4E9] rounded-lg px-5 py-12 text-center text-sm text-[#6B7280]">
@@ -302,7 +278,6 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
           busyKey={busyKey}
           isAwarded={isAwarded}
           onToggleEliminated={toggleEliminated}
-          onToggleTraitor={toggleTraitor}
           onSaveActualResults={saveActualResults}
           onSubmitWeek={submitWeek}
           onSaveWeekTheme={saveWeekTheme}
@@ -396,7 +371,6 @@ function WeeklyTop3Scoring({
   busyKey,
   isAwarded,
   onToggleEliminated,
-  onToggleTraitor,
   onSaveActualResults,
   onSubmitWeek,
   onSaveWeekTheme,
@@ -407,7 +381,6 @@ function WeeklyTop3Scoring({
   busyKey: string | null;
   isAwarded: (ruleId: string, contestant: string) => boolean;
   onToggleEliminated: (contestant: string) => void;
-  onToggleTraitor: (contestant: string) => void;
   onSaveActualResults: (payload: { actualFinalFour?: string[]; actualWinner?: string }) => void;
   onSubmitWeek: (
     scoreChanges: { contestant: string; score: number }[],
@@ -579,39 +552,6 @@ function WeeklyTop3Scoring({
             Not scored here — each league&apos;s commissioner checks their own members&apos; song predictions from
             their league page.
           </p>
-        </div>
-      )}
-
-      {isTraitors && (
-        <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
-          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">TRAITORS (CURRENTLY)</div>
-          <p className="text-xs text-[#8A909B] mb-3">
-            Toggle who&apos;s playing as a Traitor right now — everyone else counts as Faithful. Update this as
-            faithfuls get recruited.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {template.contestants.map((c) => {
-              const isTraitor = template.traitorContestants.includes(c);
-              return (
-                <button
-                  key={c}
-                  onClick={() => onToggleTraitor(c)}
-                  disabled={busyKey === `traitor:${c}`}
-                  className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition disabled:opacity-50 ${
-                    isTraitor
-                      ? "bg-[#16181D] text-white border-[#16181D]"
-                      : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
-                  }`}
-                >
-                  {isTraitor ? "🗡️ " : ""}
-                  {c}
-                </button>
-              );
-            })}
-            {template.contestants.length === 0 && (
-              <p className="text-xs text-[#8A909B]">No contestants — add some in League Templates.</p>
-            )}
-          </div>
         </div>
       )}
 
