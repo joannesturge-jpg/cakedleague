@@ -833,7 +833,9 @@ function WeeklyPicksForm({
   const [selectedWeek, setSelectedWeek] = useState(() => {
     const scoredWeeks = template?.weeklyScores.map((s) => s.week) ?? [];
     const nextWeek = (scoredWeeks.length ? Math.max(...scoredWeeks) : 0) + 1;
-    return Math.min(Math.max(nextWeek, 1), weeks || 1);
+    // Traitors skips week 1 — picks start week 2.
+    const minWeek = template?.tag === "TRTRS" ? 2 : 1;
+    return Math.min(Math.max(nextWeek, minWeek), weeks || 1);
   });
   const [showContestants, setShowContestants] = useState(false);
 
@@ -872,7 +874,7 @@ function WeeklyPicksForm({
 
   // Weekly top-three + song prediction — same pattern, but per-week: each
   // week starts in edit mode until that week has a saved pick.
-  const startingPick = weeklyPicks.find((p) => p.week === 1);
+  const startingPick = weeklyPicks.find((p) => p.week === (template?.tag === "TRTRS" ? 2 : 1));
   const [draftTop, setDraftTop] = useState<[string, string, string]>([
     startingPick?.topThree[0] ?? "",
     startingPick?.topThree[1] ?? "",
@@ -1124,12 +1126,14 @@ function WeeklyPicksForm({
               onChange={(e) => changeWeek(Number(e.target.value))}
               className="px-3 py-2 rounded-lg bg-ink/60 border border-cream/15 text-cream text-sm outline-none"
             >
-              {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
-                <option key={w} value={w}>
-                  Week {w}
-                  {weekTheme(w) ? ` — ${weekTheme(w)}` : ""}
-                </option>
-              ))}
+              {Array.from({ length: weeks }, (_, i) => i + 1)
+                .filter((w) => !isTraitors || w >= 2)
+                .map((w) => (
+                  <option key={w} value={w}>
+                    Week {w}
+                    {weekTheme(w) ? ` — ${weekTheme(w)}` : ""}
+                  </option>
+                ))}
             </select>
           </div>
           {!isSurvivor && !isTraitors && weeklyEditing && weekOpen && !weekDuePassed ? (
@@ -1556,7 +1560,8 @@ function SubmissionsTab({
   const [week, setWeek] = useState(() => {
     const scoredWeeks = weeklyScores.map((s) => s.week);
     const nextWeek = (scoredWeeks.length ? Math.max(...scoredWeeks) : 0) + 1;
-    return Math.min(Math.max(nextWeek, 1), weeks || 1);
+    const minWeek = isTraitors ? 2 : 1;
+    return Math.min(Math.max(nextWeek, minWeek), weeks || 1);
   });
   const [seasonOpen, setSeasonOpen] = useState(false);
   const [songSaving, setSongSaving] = useState(false);
@@ -1694,11 +1699,13 @@ function SubmissionsTab({
           onChange={(e) => setWeek(Number(e.target.value))}
           className="px-3.5 py-2.5 rounded-xl bg-card border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
         >
-          {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
-            <option key={w} value={w}>
-              Week {w}
-            </option>
-          ))}
+          {Array.from({ length: weeks }, (_, i) => i + 1)
+            .filter((w) => !isTraitors || w >= 2)
+            .map((w) => (
+              <option key={w} value={w}>
+                Week {w}
+              </option>
+            ))}
         </select>
       </div>
 

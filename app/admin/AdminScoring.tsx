@@ -52,14 +52,13 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
   const router = useRouter();
   // DWTS is the live show right now — default to it instead of whatever
   // happens to be first in the list.
-  const [templateId, setTemplateId] = useState(
-    () =>
-      templates.find((t) => t.tag === "DWTS")?.id ??
-      templates.find((t) => t.pickFormat === "WEEKLY_TOP3")?.id ??
-      templates[0]?.id ??
-      ""
-  );
-  const [week, setWeek] = useState(1);
+  const defaultTemplate =
+    templates.find((t) => t.tag === "DWTS") ??
+    templates.find((t) => t.pickFormat === "WEEKLY_TOP3") ??
+    templates[0] ??
+    null;
+  const [templateId, setTemplateId] = useState(() => defaultTemplate?.id ?? "");
+  const [week, setWeek] = useState(() => (defaultTemplate?.tag === "TRTRS" ? 2 : 1));
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -239,8 +238,9 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
         <select
           value={templateId}
           onChange={(e) => {
+            const next = templates.find((t) => t.id === e.target.value);
             setTemplateId(e.target.value);
-            setWeek(1);
+            setWeek(next?.tag === "TRTRS" ? 2 : 1);
           }}
           className="px-3.5 py-2.5 rounded-md border border-[#D6D9E0] bg-white text-[#16181D] font-sans text-sm outline-none focus:border-purple transition"
         >
@@ -257,11 +257,13 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
             onChange={(e) => setWeek(Number(e.target.value))}
             className="px-3 py-2.5 rounded-md border border-[#D6D9E0] bg-white text-[#16181D] font-sans text-sm outline-none focus:border-purple transition"
           >
-            {Array.from({ length: template.weeks }, (_, i) => i + 1).map((w) => (
-              <option key={w} value={w}>
-                Week {w}
-              </option>
-            ))}
+            {Array.from({ length: template.weeks }, (_, i) => i + 1)
+              .filter((w) => template.tag !== "TRTRS" || w >= 2)
+              .map((w) => (
+                <option key={w} value={w}>
+                  Week {w}
+                </option>
+              ))}
           </select>
         </div>
       </div>
