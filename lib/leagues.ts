@@ -306,3 +306,12 @@ export const SURVIVOR_TOP_FOUR_LOCK_AT = "2026-10-01T00:00:00.000Z";
 export function isSurvivorTopFourLocked() {
   return Date.now() >= new Date(SURVIVOR_TOP_FOUR_LOCK_AT).getTime();
 }
+
+// Same idea, for Traitors' pre-season "Traitors or Faithfuls win?" pick:
+// 6:00 PM Pacific on Sept 23, 2026 — the same moment week 2's picks are
+// due, since the season effectively starts being tracked then.
+export const TRAITORS_PREDICTION_LOCK_AT = "2026-09-24T01:00:00.000Z";
+
+export function isTraitorsPredictionLocked() {
+  return Date.now() >= new Date(TRAITORS_PREDICTION_LOCK_AT).getTime();
+}

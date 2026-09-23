@@ -27,6 +27,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (Array.isArray(body.eliminatedContestants)) {
     data.eliminatedContestants = body.eliminatedContestants.filter((c: unknown): c is string => typeof c === "string");
   }
+  if (Array.isArray(body.traitorContestants)) {
+    data.traitorContestants = body.traitorContestants.filter((c: unknown): c is string => typeof c === "string");
+  }
   if (typeof body.draftOpenDay === "string") data.draftOpenDay = body.draftOpenDay || null;
   if (typeof body.draftOpenTime === "string") data.draftOpenTime = body.draftOpenTime || null;
   if (body.weekThemes && typeof body.weekThemes === "object" && !Array.isArray(body.weekThemes)) {

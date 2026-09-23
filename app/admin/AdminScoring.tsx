@@ -21,6 +21,7 @@ export type AdminScoringTemplate = {
   weeks: number;
   contestants: string[];
   eliminatedContestants: string[];
+  traitorContestants: string[];
   pickFormat: string;
   rules: AdminScoringRule[];
   ruleAwards: AdminRuleAward[];
@@ -39,6 +40,14 @@ export type AdminScoringTemplate = {
 // from Actual Season Winner and the Couple Eliminated toggles — so
 // there's nothing left to manually award for either one.
 const RANK_DERIVED_PATTERN = /top three|song|winner pick/i;
+
+// Same idea, for Traitors (TRTRS) — these labels are informational/
+// engine-computed from the "went home," shield, and votes-against
+// inputs, not their own checkbox. Kept separate from RANK_DERIVED_PATTERN
+// since Survivor's genuinely-manual "Survives the episode" rule would
+// otherwise collide with Traitors' derived one of the same name.
+const TRAITORS_DERIVED_PATTERN =
+  /prediction correct|survives the episode|eliminated this episode|predicted player goes home|all three selections|receives 0 votes/i;
 
 export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] }) {
   const router = useRouter();
@@ -201,6 +210,29 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
     }
   }
 
+  async function toggleTraitor(contestant: string) {
+    if (!template) return;
+    const key = `traitor:${contestant}`;
+    setBusyKey(key);
+    setError("");
+    const next = template.traitorContestants.includes(contestant)
+      ? template.traitorContestants.filter((c) => c !== contestant)
+      : [...template.traitorContestants, contestant];
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ traitorContestants: next }),
+      });
+      if (!res.ok) throw new Error("Couldn't update that");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't update that");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   if (!template) {
     return (
       <div className="bg-white border border-[#E2E4E9] rounded-lg px-5 py-12 text-center text-sm text-[#6B7280]">
@@ -270,6 +302,7 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
           busyKey={busyKey}
           isAwarded={isAwarded}
           onToggleEliminated={toggleEliminated}
+          onToggleTraitor={toggleTraitor}
           onSaveActualResults={saveActualResults}
           onSubmitWeek={submitWeek}
           onSaveWeekTheme={saveWeekTheme}
@@ -363,6 +396,7 @@ function WeeklyTop3Scoring({
   busyKey,
   isAwarded,
   onToggleEliminated,
+  onToggleTraitor,
   onSaveActualResults,
   onSubmitWeek,
   onSaveWeekTheme,
@@ -373,6 +407,7 @@ function WeeklyTop3Scoring({
   busyKey: string | null;
   isAwarded: (ruleId: string, contestant: string) => boolean;
   onToggleEliminated: (contestant: string) => void;
+  onToggleTraitor: (contestant: string) => void;
   onSaveActualResults: (payload: { actualFinalFour?: string[]; actualWinner?: string }) => void;
   onSubmitWeek: (
     scoreChanges: { contestant: string; score: number }[],
@@ -386,6 +421,11 @@ function WeeklyTop3Scoring({
   // week theme, per-couple score grid, and song predictions note (all
   // DWTS-specific) don't apply and stay hidden.
   const isSurvivor = template.tag === "SRVR";
+  // Traitors also skips week theme and song predictions, but — unlike
+  // Survivor — still needs the numeric per-contestant grid, just
+  // relabeled (it's votes-against, not a top-three ranking).
+  const isTraitors = template.tag === "TRTRS";
+  const showDwtsExtras = !isSurvivor && !isTraitors;
 
   const scoresThisWeek = template.weeklyScores.filter((s) => s.week === week);
   const scoreOf = (c: string) => scoresThisWeek.find((s) => s.contestant === c)?.score ?? 0;
@@ -405,7 +445,8 @@ function WeeklyTop3Scoring({
   // marked eliminated would make that unrecordable.
   const allContestants = template.contestants;
 
-  const otherRules = template.rules.filter((r) => !RANK_DERIVED_PATTERN.test(r.label));
+  const derivedPattern = isTraitors ? TRAITORS_DERIVED_PATTERN : RANK_DERIVED_PATTERN;
+  const otherRules = template.rules.filter((r) => !derivedPattern.test(r.label));
 
   // Nothing here saves as it's typed/clicked — it's all held in a local
   // draft, seeded from the committed data, until "Submit Week N" is
@@ -470,7 +511,7 @@ function WeeklyTop3Scoring({
         onSaveActualResults={onSaveActualResults}
       />
 
-      {!isSurvivor && (
+      {showDwtsExtras && (
         <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
           <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2">WEEK {week} THEME</div>
           <div className="flex items-center gap-2">
@@ -493,13 +534,17 @@ function WeeklyTop3Scoring({
 
       {!isSurvivor && (
         <div className="bg-white border border-[#E2E4E9] rounded-lg p-[18px]">
-          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SCORE EVERY COUPLE</div>
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">
+            {isTraitors ? "VOTES AGAINST EACH CONTESTANT" : "SCORE EVERY COUPLE"}
+          </div>
           <p className="text-xs text-[#8A909B] mb-3">
-            Enter each couple&apos;s score for the week — the top three (ties included) are ranked automatically below.
+            {isTraitors
+              ? "Enter how many votes each contestant received at the Round Table this week — 0 triggers a bonus for whoever picked them."
+              : "Enter each couple's score for the week — the top three (ties included) are ranked automatically below."}
           </p>
           <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
             {allContestants.map((c) => {
-              const inTop3 = topThree.has(c);
+              const inTop3 = !isTraitors && topThree.has(c);
               const eliminated = template.eliminatedContestants.includes(c);
               return (
                 <div
@@ -527,13 +572,46 @@ function WeeklyTop3Scoring({
         </div>
       )}
 
-      {!isSurvivor && (
+      {showDwtsExtras && (
         <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
           <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-1">SONG PREDICTIONS</div>
           <p className="text-sm text-[#5B6270]">
             Not scored here — each league&apos;s commissioner checks their own members&apos; song predictions from
             their league page.
           </p>
+        </div>
+      )}
+
+      {isTraitors && (
+        <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
+          <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">TRAITORS (CURRENTLY)</div>
+          <p className="text-xs text-[#8A909B] mb-3">
+            Toggle who&apos;s playing as a Traitor right now — everyone else counts as Faithful. Update this as
+            faithfuls get recruited.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {template.contestants.map((c) => {
+              const isTraitor = template.traitorContestants.includes(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => onToggleTraitor(c)}
+                  disabled={busyKey === `traitor:${c}`}
+                  className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition disabled:opacity-50 ${
+                    isTraitor
+                      ? "bg-[#16181D] text-white border-[#16181D]"
+                      : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                  }`}
+                >
+                  {isTraitor ? "🗡️ " : ""}
+                  {c}
+                </button>
+              );
+            })}
+            {template.contestants.length === 0 && (
+              <p className="text-xs text-[#8A909B]">No contestants — add some in League Templates.</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -549,7 +627,7 @@ function WeeklyTop3Scoring({
 
       <div className="bg-white border border-[#E2E4E9] rounded-lg px-[18px] py-4">
         <div className="text-[10.5px] tracking-widest text-[#8A909B] font-bold mb-2.5">
-          {isSurvivor ? "CONTESTANT ELIMINATED" : "COUPLE ELIMINATED"}
+          {isSurvivor || isTraitors ? "CONTESTANT ELIMINATED" : "COUPLE ELIMINATED"}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {template.contestants.map((c) => {
@@ -920,6 +998,10 @@ function SeasonPredictionsAnswerKey({
   // Survivor has no separate season-winner pick — just the pre-season
   // top four — so there's nothing to enter an answer key for here.
   const isSurvivor = template.tag === "SRVR";
+  // Traitors is the opposite: no top-four pick, just the one binary
+  // Traitors-vs-Faithfuls prediction, reusing the same actualWinner
+  // field with "Traitors" / "Faithfuls" as its two possible values.
+  const isTraitors = template.tag === "TRTRS";
 
   function toggle(c: string) {
     setPicking((prev) =>
@@ -935,57 +1017,101 @@ function SeasonPredictionsAnswerKey({
       <p className="text-xs text-[#8A909B] mb-3">
         {isSurvivor
           ? "Can only be set once — pick it whenever the real result is known. Members predicted their top four for +5 points each, before week one."
-          : "Each of these can only be set once — pick them whenever the real result is known. Members predicted the final four for +5 points each and the season winner once, before week one."}
+          : isTraitors
+            ? "Can only be set once — pick it whenever the real result is known. Members predicted Traitors or Faithfuls for +5 points, before week one."
+            : "Each of these can only be set once — pick them whenever the real result is known. Members predicted the final four for +5 points each and the season winner once, before week one."}
       </p>
 
-      <div className="mb-4">
-        <div className="text-[13px] font-semibold text-[#16181D] mb-2">
-          Actual final four {finalFourLocked ? "" : `(${picking.length}/4)`}
-        </div>
-        {finalFourLocked ? (
-          <div className="flex flex-wrap gap-1.5">
-            {template.actualFinalFour.map((c) => (
-              <span
-                key={c}
-                className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold bg-[#EEF8F1] border border-[#1E7B45]/40 text-[#1E7B45]"
-              >
-                ✓ {c}
-              </span>
-            ))}
+      {!isTraitors && (
+        <div className="mb-4">
+          <div className="text-[13px] font-semibold text-[#16181D] mb-2">
+            Actual final four {finalFourLocked ? "" : `(${picking.length}/4)`}
           </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-1.5 mb-2.5">
-              {template.contestants.map((c) => {
-                const selected = picking.includes(c);
-                return (
-                  <button
-                    key={c}
-                    onClick={() => toggle(c)}
-                    className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
-                      selected
-                        ? "bg-purple/10 border-purple text-purple"
-                        : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
-                    }`}
-                  >
-                    {selected ? "✓ " : ""}
-                    {c}
-                  </button>
-                );
-              })}
+          {finalFourLocked ? (
+            <div className="flex flex-wrap gap-1.5">
+              {template.actualFinalFour.map((c) => (
+                <span
+                  key={c}
+                  className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold bg-[#EEF8F1] border border-[#1E7B45]/40 text-[#1E7B45]"
+                >
+                  ✓ {c}
+                </span>
+              ))}
             </div>
-            <button
-              onClick={() => onSaveActualResults({ actualFinalFour: picking })}
-              disabled={picking.length !== 4 || busyKey === "actual:finalFour"}
-              className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
-            >
-              {busyKey === "actual:finalFour" ? "Locking in…" : "Lock in final four"}
-            </button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {template.contestants.map((c) => {
+                  const selected = picking.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => toggle(c)}
+                      className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                        selected
+                          ? "bg-purple/10 border-purple text-purple"
+                          : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => onSaveActualResults({ actualFinalFour: picking })}
+                disabled={picking.length !== 4 || busyKey === "actual:finalFour"}
+                className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+              >
+                {busyKey === "actual:finalFour" ? "Locking in…" : "Lock in final four"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
-      {!isSurvivor && (
+      {isTraitors && (
+        <div>
+          <div className="text-[13px] font-semibold text-[#16181D] mb-2">Actual outcome</div>
+          {winnerLocked ? (
+            <span className="px-2.5 py-1.5 rounded-md text-[13px] font-semibold bg-[#EEF8F1] border border-[#1E7B45]/40 text-[#1E7B45] inline-block">
+              ✓ {template.actualWinner}
+            </span>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {["Traitors", "Faithfuls"].map((c) => {
+                  const selected = pickedWinner === c;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => setPickedWinner(c)}
+                      className={`px-2.5 py-1.5 rounded-md text-[13px] font-semibold border transition ${
+                        selected
+                          ? "bg-purple/10 border-purple text-purple"
+                          : "bg-white border-[#D6D9E0] text-[#5B6270] hover:border-purple"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}
+                      {c} win
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => pickedWinner && onSaveActualResults({ actualWinner: pickedWinner })}
+                disabled={!pickedWinner || busyKey === "actual:winner"}
+                className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
+              >
+                {busyKey === "actual:winner" ? "Locking in…" : "Lock in outcome"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {!isSurvivor && !isTraitors && (
         <div>
           <div className="text-[13px] font-semibold text-[#16181D] mb-2">Actual season winner</div>
           {winnerLocked ? (

@@ -8,6 +8,7 @@ import {
   formatOpenDate,
   isSeasonPredictionsLocked,
   isSurvivorTopFourLocked,
+  isTraitorsPredictionLocked,
   isWeekOpen,
   weekOpenInstant,
   isWeekDuePassed,
@@ -22,6 +23,7 @@ import { ContestantsModal } from "./ContestantsModal";
 import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./CategoryPicksModal";
 import { breakdownDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
 import { breakdownSurvivorMember } from "@/lib/survivor-scoring";
+import { breakdownTraitorsMember } from "@/lib/traitors-scoring";
 import { ScoreBreakdownModal } from "./ScoreBreakdownModal";
 import { AdjustScoreModal, type AdjustMode } from "./AdjustScoreModal";
 
@@ -60,6 +62,7 @@ type Template = {
   tag: string | null;
   contestants: string[];
   eliminatedContestants: string[];
+  traitorContestants: string[];
   draftOpenDay: string | null;
   draftOpenTime: string | null;
   pickFormat: string;
@@ -645,6 +648,8 @@ export function LeaguePageClient({
         (league.template?.pickFormat === "WEEKLY_TOP3" ? (
           league.template.tag === "SRVR" ? (
             <SurvivorLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
+          ) : league.template.tag === "TRTRS" ? (
+            <TraitorsLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
           ) : (
             <DwtsLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
           )
@@ -907,6 +912,11 @@ function WeeklyPicksForm({
   // pre-season top four — and no song prediction rule, so both stay
   // hidden for them.
   const isSurvivor = template.tag === "SRVR";
+  // Traitors has the opposite shape: a binary Traitors-vs-Faithfuls
+  // pick (reusing winnerPick/onPickWinner) instead of a contestant-name
+  // winner pick, no final four at all, and three weekly picks with
+  // fixed distinct roles instead of an unordered top three.
+  const isTraitors = template.tag === "TRTRS";
   const active = template.contestants.filter((c) => !template.eliminatedContestants.includes(c));
   const existing = weeklyPicks.find((p) => p.week === selectedWeek);
   const weekThemes = (template.weekThemes as Record<string, string> | null) ?? {};
@@ -919,10 +929,63 @@ function WeeklyPicksForm({
   const canSave = weekOpen && !weekDuePassed && draftTop.every((c) => c) && new Set(draftTop).size === 3;
 
   const topFourLocked = isSurvivor ? isSurvivorTopFourLocked() : isSeasonPredictionsLocked();
+  const traitorsPredictionLocked = isTraitorsPredictionLocked();
 
   return (
     <div className="flex flex-col gap-3">
-      {!isSurvivor && !isSeasonPredictionsLocked() && (
+      {isTraitors && !traitorsPredictionLocked && (
+        <div className="bg-card border border-cream/10 rounded-3xl p-6">
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <h3 className="font-display text-xl tracking-wide">TRAITORS OR FAITHFULS?</h3>
+            {!winnerEditing && (
+              <button
+                onClick={enterWinnerEdit}
+                className="text-sm font-semibold text-pink hover:text-pink/75 transition flex items-center gap-1"
+              >
+                <span aria-hidden>✎</span> Edit
+              </button>
+            )}
+          </div>
+          {!winnerEditing ? (
+            <p className="text-sm text-cream/70">
+              Your pick: <span className="text-pink font-semibold">{winnerPick} win</span>
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-cream/55 mb-3">+5 points if you get it right. Locks today at 6:00 PM PT.</p>
+              {winnerError && <p className="text-sm text-pink font-medium mb-2">{winnerError}</p>}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {["Traitors", "Faithfuls"].map((c) => {
+                  const selected = draftWinner === c;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => setDraftWinner(c)}
+                      className={`px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                        selected
+                          ? "border-pink bg-pink/15 text-pink"
+                          : "border-cream/15 bg-ink/40 text-cream/80 hover:border-pink"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}
+                      {c} win
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={saveWinner}
+                disabled={!draftWinner || winnerBusy}
+                className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
+              >
+                {winnerBusy ? "Saving…" : "Save"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {!isSurvivor && !isTraitors && !isSeasonPredictionsLocked() && (
         <div className="bg-card border border-cream/10 rounded-3xl p-6">
           <div className="flex items-center justify-between gap-3 mb-1.5">
             <h3 className="font-display text-xl tracking-wide">SEASON WINNER</h3>
@@ -976,7 +1039,7 @@ function WeeklyPicksForm({
         </div>
       )}
 
-      {!topFourLocked && (
+      {!isTraitors && !topFourLocked && (
         <div className="bg-card border border-cream/10 rounded-3xl p-6">
           <div className="flex items-center justify-between gap-3 mb-1.5">
             <h3 className="font-display text-xl tracking-wide">
@@ -1060,7 +1123,7 @@ function WeeklyPicksForm({
               ))}
             </select>
           </div>
-          {!isSurvivor && weeklyEditing && weekOpen && !weekDuePassed ? (
+          {!isSurvivor && !isTraitors && weeklyEditing && weekOpen && !weekDuePassed ? (
             <button
               onClick={() => setShowContestants(true)}
               className="px-3 py-2 rounded-lg border border-cream/15 text-cream/80 text-sm font-semibold hover:border-pink hover:text-pink transition"
@@ -1082,7 +1145,7 @@ function WeeklyPicksForm({
         {/* ContestantsModal is hardcoded to DWTS's cast photos (DWTS_CAST)
             — it doesn't generically render whatever `contestants` list is
             passed in, so it can't be reused for Survivor's real cast. */}
-        {!isSurvivor && showContestants && (
+        {!isSurvivor && !isTraitors && showContestants && (
           <ContestantsModal
             contestants={template.contestants}
             eliminatedContestants={template.eliminatedContestants}
@@ -1099,13 +1162,21 @@ function WeeklyPicksForm({
         ) : !weeklyEditing && existing ? (
           <>
             <p className="text-sm text-cream/55 mb-3 mt-3">Your picks for this week:</p>
-            <ol className="flex flex-col gap-1 mb-2">
-              {existing.topThree.map((c, i) => (
-                <li key={i} className="text-sm text-cream/78">
-                  {i + 1}. {c}
-                </li>
-              ))}
-            </ol>
+            {isTraitors ? (
+              <ol className="flex flex-col gap-1 mb-2 text-sm text-cream/78">
+                <li>Traitor to survive: {existing.topThree[0] || "—"}</li>
+                <li>Faithful to survive: {existing.topThree[1] || "—"}</li>
+                <li>Predicted to go home: {existing.topThree[2] || "—"}</li>
+              </ol>
+            ) : (
+              <ol className="flex flex-col gap-1 mb-2">
+                {existing.topThree.map((c, i) => (
+                  <li key={i} className="text-sm text-cream/78">
+                    {i + 1}. {c}
+                  </li>
+                ))}
+              </ol>
+            )}
             {existing.songPrediction && (
               <p className="text-xs text-cream/50">Song: {existing.songPrediction}</p>
             )}
@@ -1123,35 +1194,117 @@ function WeeklyPicksForm({
         ) : (
           <>
             <p className="text-sm text-cream/55 mb-4">
-              {isSurvivor ? "Pick three castaways to root for this week." : "Rank your top three for this week, in order."}
+              {isSurvivor
+                ? "Pick three castaways to root for this week."
+                : isTraitors
+                  ? "Pick who survives, and who you think goes home, this week."
+                  : "Rank your top three for this week, in order."}
             </p>
             {weeklyError && <p className="text-sm text-pink font-medium mb-3">{weeklyError}</p>}
-            <div className="flex flex-col gap-2.5 mb-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="w-6 text-sm font-display text-pink flex-none">{i + 1}.</span>
+            {isTraitors ? (
+              <div className="flex flex-col gap-3.5 mb-4">
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-1.5">
+                    TRAITOR TO SURVIVE
+                  </label>
                   <select
-                    value={draftTop[i]}
+                    value={draftTop[0]}
                     onChange={(e) =>
                       setDraftTop((prev) => {
                         const next = [...prev] as [string, string, string];
-                        next[i] = e.target.value;
+                        next[0] = e.target.value;
                         return next;
                       })
                     }
-                    className="flex-1 px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                    className="w-full px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
                   >
-                    <option value="">{isSurvivor ? "Choose a contestant" : "Choose a couple"}</option>
+                    <option value="">Choose a Traitor</option>
+                    {active
+                      .filter((c) => template.traitorContestants.includes(c))
+                      .map((c) => (
+                        <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[0] !== c}>
+                          {c}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-1.5">
+                    FAITHFUL TO SURVIVE
+                  </label>
+                  <select
+                    value={draftTop[1]}
+                    onChange={(e) =>
+                      setDraftTop((prev) => {
+                        const next = [...prev] as [string, string, string];
+                        next[1] = e.target.value;
+                        return next;
+                      })
+                    }
+                    className="w-full px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                  >
+                    <option value="">Choose a Faithful</option>
+                    {active
+                      .filter((c) => !template.traitorContestants.includes(c))
+                      .map((c) => (
+                        <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[1] !== c}>
+                          {c}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-1.5">
+                    PREDICTED TO GO HOME
+                  </label>
+                  <select
+                    value={draftTop[2]}
+                    onChange={(e) =>
+                      setDraftTop((prev) => {
+                        const next = [...prev] as [string, string, string];
+                        next[2] = e.target.value;
+                        return next;
+                      })
+                    }
+                    className="w-full px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                  >
+                    <option value="">Choose a contestant</option>
                     {active.map((c) => (
-                      <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[i] !== c}>
+                      <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[2] !== c}>
                         {c}
                       </option>
                     ))}
                   </select>
                 </div>
-              ))}
-            </div>
-            {!isSurvivor && (
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 mb-4">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="w-6 text-sm font-display text-pink flex-none">{i + 1}.</span>
+                    <select
+                      value={draftTop[i]}
+                      onChange={(e) =>
+                        setDraftTop((prev) => {
+                          const next = [...prev] as [string, string, string];
+                          next[i] = e.target.value;
+                          return next;
+                        })
+                      }
+                      className="flex-1 px-3 py-2.5 rounded-xl bg-ink/60 border border-cream/15 text-cream text-sm outline-none focus:border-pink transition"
+                    >
+                      <option value="">{isSurvivor ? "Choose a contestant" : "Choose a couple"}</option>
+                      {active.map((c) => (
+                        <option key={c} value={c} disabled={draftTop.includes(c) && draftTop[i] !== c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!isSurvivor && !isTraitors && (
               <>
                 <label className="block text-[11px] font-bold tracking-widest text-cream/46 mb-2">
                   SONG PREDICTION (OPTIONAL)
@@ -1387,6 +1540,7 @@ function SubmissionsTab({
   weeklyScores: { week: number }[];
 }) {
   const isSurvivor = tag === "SRVR";
+  const isTraitors = tag === "TRTRS";
   const router = useRouter();
   // Same "next unscored week" default as the pick form — once a week's
   // scored, there's no reason to land on it instead of the current one.
@@ -1403,10 +1557,13 @@ function SubmissionsTab({
   // an admin previewing a league they're not a member of has nothing to
   // submit, so that gate would otherwise make the preview useless.
   const unlocked = !!myPick || isAdminPreview;
-  // Survivor has no season-winner pick — just the top four — so its
-  // "submitted" check can't require winnerPick the way DWTS's does.
+  // Survivor has no season-winner pick — just the top four. Traitors is
+  // the opposite — just the winnerPick, no final four. Neither
+  // "submitted" check can require both the way DWTS's does.
   function hasSeasonPrediction(m: Member) {
-    return isSurvivor ? m.finalFourPicks.length === 4 : !!m.winnerPick && m.finalFourPicks.length === 4;
+    if (isSurvivor) return m.finalFourPicks.length === 4;
+    if (isTraitors) return !!m.winnerPick;
+    return !!m.winnerPick && m.finalFourPicks.length === 4;
   }
   const seasonPredictionsUnlocked = (!!me && hasSeasonPrediction(me)) || isAdminPreview;
   const seasonSubmittedCount = members.filter(hasSeasonPrediction).length;
@@ -1493,13 +1650,19 @@ function SubmissionsTab({
                     </div>
                     {hasSeasonPrediction(m) ? (
                       <p className="text-xs text-cream/68 leading-snug">
-                        {!isSurvivor && (
+                        {isTraitors ? (
+                          <>Prediction: {m.winnerPick} win</>
+                        ) : (
                           <>
-                            Winner: {celebrityName(m.winnerPick!)}
-                            <br />
+                            {!isSurvivor && (
+                              <>
+                                Winner: {celebrityName(m.winnerPick!)}
+                                <br />
+                              </>
+                            )}
+                            Top 4: {m.finalFourPicks.map(celebrityName).join(", ")}
                           </>
                         )}
-                        Top 4: {m.finalFourPicks.map(celebrityName).join(", ")}
                       </p>
                     ) : (
                       <p className="text-xs text-cream/40">Not submitted yet.</p>
@@ -1540,7 +1703,7 @@ function SubmissionsTab({
         </div>
       ) : (
         <>
-          {pickFormat === "WEEKLY_TOP3" && !isSurvivor && (() => {
+          {pickFormat === "WEEKLY_TOP3" && !isSurvivor && !isTraitors && (() => {
             const withSongs = members.filter((m) => m.weeklyPicks.find((p) => p.week === week)?.songPrediction);
             return (
               <div className="bg-card border border-cream/10 rounded-3xl p-6 mb-5">
@@ -1594,7 +1757,9 @@ function SubmissionsTab({
           })()}
 
           <div className="flex flex-col gap-2.5">
-            <h3 className="font-display text-base tracking-wide text-cream/60">TOP THREE</h3>
+            <h3 className="font-display text-base tracking-wide text-cream/60">
+              {isTraitors ? "PICKS" : "TOP THREE"}
+            </h3>
             {members.map((m) => {
               const pick = m.weeklyPicks.find((p) => p.week === week);
               const isMe = m.id === myMembershipId;
@@ -1608,13 +1773,21 @@ function SubmissionsTab({
                     {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
                   </div>
                   {pick ? (
-                    <ol className="flex flex-col gap-1">
-                      {pick.topThree.map((c, i) => (
-                        <li key={i} className="text-sm text-cream/78">
-                          {i + 1}. {c}
-                        </li>
-                      ))}
-                    </ol>
+                    isTraitors ? (
+                      <ol className="flex flex-col gap-1 text-sm text-cream/78">
+                        <li>Traitor to survive: {pick.topThree[0] || "—"}</li>
+                        <li>Faithful to survive: {pick.topThree[1] || "—"}</li>
+                        <li>Predicted to go home: {pick.topThree[2] || "—"}</li>
+                      </ol>
+                    ) : (
+                      <ol className="flex flex-col gap-1">
+                        {pick.topThree.map((c, i) => (
+                          <li key={i} className="text-sm text-cream/78">
+                            {i + 1}. {c}
+                          </li>
+                        ))}
+                      </ol>
+                    )
                   ) : (
                     <p className="text-sm text-cream/40">Not submitted yet.</p>
                   )}
@@ -1842,6 +2015,143 @@ function SurvivorLeaderboard({
           <h3 className="font-display text-lg tracking-wide mb-3">RESULTS SO FAR</h3>
           <p className="text-sm text-cream/70">
             <span className="text-cream/45">Final four:</span> {template.actualFinalFour.join(", ")}
+          </p>
+        </div>
+      )}
+
+      <div className="bg-card border border-cream/10 rounded-3xl p-2">
+        {standings.map((row, i) => {
+          const isMe = row.member.userId === currentUserId;
+          return (
+            <div
+              key={row.member.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0 ${
+                isMe ? "border border-pink" : ""
+              }`}
+              style={{ background: isMe ? "rgba(232,91,174,.12)" : i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
+            >
+              <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
+              <span
+                className="w-7 h-7 rounded-full flex-none"
+                style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+              />
+              <span className="flex-1 text-[14.5px] font-medium truncate flex items-center gap-2">
+                {row.member.user.name}
+                {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
+              </span>
+              <button
+                onClick={() => setSelectedMemberId(row.member.id)}
+                className="font-display text-lg text-pink hover:text-cream transition"
+                title="See how this score breaks down"
+              >
+                {row.points}
+              </button>
+              {isOwner && (
+                <div className="flex items-center gap-1 flex-none">
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "ADD" })}
+                    title="Add points"
+                    aria-label={`Add points to ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SUBTRACT" })}
+                    title="Subtract points"
+                    aria-label={`Subtract points from ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SET" })}
+                    title="Set total score"
+                    aria-label={`Set ${row.member.user.name}'s total score`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    =
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <ScoreBreakdownModal
+          memberName={selected.member.user.name}
+          totalPoints={selected.points}
+          groups={selected.groups}
+          onClose={() => setSelectedMemberId(null)}
+        />
+      )}
+
+      {adjustTarget && adjusting && (
+        <AdjustScoreModal
+          leagueId={league.id}
+          memberId={adjusting.member.id}
+          memberName={adjusting.member.user.name}
+          mode={adjustTarget.mode}
+          currentTotal={adjusting.points}
+          onClose={() => setAdjustTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// The Traitors (TRTRS) — same WEEKLY_TOP3 shape as DWTS/Survivor, but
+// each week's three picks have distinct fixed roles (see
+// lib/traitors-scoring.ts), so it gets its own breakdown call. Layout
+// and commissioner-adjustment actions otherwise match the other two.
+function TraitorsLeaderboard({
+  league,
+  currentUserId,
+  isOwner,
+}: {
+  league: League;
+  currentUserId: string;
+  isOwner: boolean;
+}) {
+  const template = league.template;
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<{ memberId: string; mode: AdjustMode } | null>(null);
+  if (!template) return null;
+
+  const hasAnyResults = template.ruleAwards.length > 0 || template.weeklyScores.length > 0 || !!template.actualWinner;
+
+  const ruleAwards = template.ruleAwards.map((a) => ({ week: a.week, contestant: a.contestant, ruleLabel: a.rule.label }));
+
+  const standings = league.members
+    .map((m) => {
+      const groups = breakdownTraitorsMember({
+        winnerPick: m.winnerPick,
+        weeklyPicks: m.weeklyPicks,
+        ruleAwards,
+        weeklyScores: template.weeklyScores,
+        actualWinner: template.actualWinner,
+        adjustments: m.adjustments.map((a) => ({ points: a.points, note: a.note })),
+      });
+      return { member: m, groups, points: groups.reduce((sum, g) => sum + g.total, 0) };
+    })
+    .sort((a, b) => b.points - a.points);
+
+  if (!hasAnyResults) {
+    return <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />;
+  }
+
+  const selected = standings.find((s) => s.member.id === selectedMemberId);
+  const adjusting = standings.find((s) => s.member.id === adjustTarget?.memberId);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {template.actualWinner && (
+        <div className="bg-card border border-cream/10 rounded-3xl p-6">
+          <h3 className="font-display text-lg tracking-wide mb-3">RESULTS SO FAR</h3>
+          <p className="text-sm text-cream/70">
+            <span className="text-cream/45">Outcome:</span> {template.actualWinner} win
           </p>
         </div>
       )}

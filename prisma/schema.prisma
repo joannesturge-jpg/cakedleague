@@ -43,6 +43,10 @@ model LeagueTemplate {
   createdAt      DateTime @default(now())
   contestants           String[] @default([])
   eliminatedContestants String[] @default([])
+  // The Traitors (TRTRS): which contestants are currently playing as a
+  // Traitor — admin-editable, since faithfuls get recruited over the
+  // season. Anyone in `contestants` but not here is assumed Faithful.
+  traitorContestants    String[] @default([])
   tag                   String?
   // WEEKLY_TOP3 (DWTS) answer key, filled in by admin once the real
   // results are known. Each locks after its first save — see
