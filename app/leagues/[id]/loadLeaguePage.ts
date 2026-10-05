@@ -21,7 +21,7 @@ export async function loadLeaguePage(id: string) {
         },
         orderBy: { joinedAt: "asc" },
       },
-      template: { include: { weeklyScores: true, ruleAwards: { include: { rule: true } } } },
+      template: { include: { weeklyScores: true, weeklyResults: true, ruleAwards: { include: { rule: true } } } },
       picks: true,
     },
   });

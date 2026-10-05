@@ -24,6 +24,7 @@ import { CategoryPicksModal, findCategoryCast, type CategoryDraft } from "./Cate
 import { breakdownDwtsMember, actualTopThree } from "@/lib/dwts-scoring";
 import { breakdownSurvivorMember } from "@/lib/survivor-scoring";
 import { breakdownTraitorsMember } from "@/lib/traitors-scoring";
+import { breakdownCategoryMember } from "@/lib/bake-off-scoring";
 import { ScoreBreakdownModal } from "./ScoreBreakdownModal";
 import { AdjustScoreModal, type AdjustMode } from "./AdjustScoreModal";
 
@@ -69,6 +70,14 @@ type Template = {
   actualWinner: string | null;
   actualFinalFour: string[];
   weeklyScores: { week: number; contestant: string; score: number }[];
+  weeklyResults: {
+    week: number;
+    actualStarBaker: string | null;
+    actualTechnicalWinner: string | null;
+    actualVotedOff: string | null;
+    actualTechnicalLoser: string | null;
+    handshakes: unknown;
+  }[];
   ruleAwards: { week: number; contestant: string; rule: { label: string; points: number } }[];
 } | null;
 type League = {
@@ -652,6 +661,8 @@ export function LeaguePageClient({
           ) : (
             <DwtsLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
           )
+        ) : league.template?.pickFormat === "WEEKLY_CATEGORIES" ? (
+          <BakeOffLeaderboard league={league} currentUserId={currentUserId} isOwner={isOwner} />
         ) : hasCustomRules ? (
           <CustomRuleLeaderboard league={league} currentUserId={currentUserId} />
         ) : (
@@ -2175,6 +2186,146 @@ function TraitorsLeaderboard({
           </p>
         </div>
       )}
+
+      <div className="bg-card border border-cream/10 rounded-3xl p-2">
+        {standings.map((row, i) => {
+          const isMe = row.member.userId === currentUserId;
+          return (
+            <div
+              key={row.member.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 last:mb-0 ${
+                isMe ? "border border-pink" : ""
+              }`}
+              style={{ background: isMe ? "rgba(232,91,174,.12)" : i === 0 ? "rgba(232,91,174,.08)" : "transparent" }}
+            >
+              <span className="font-display text-sm text-cream/42 w-5">{i + 1}</span>
+              <span
+                className="w-7 h-7 rounded-full flex-none"
+                style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+              />
+              <span className="flex-1 text-[14.5px] font-medium truncate flex items-center gap-2">
+                {row.member.user.name}
+                {isMe && <span className="text-[9px] font-bold tracking-widest text-pink">YOU</span>}
+              </span>
+              <button
+                onClick={() => setSelectedMemberId(row.member.id)}
+                className="font-display text-lg text-pink hover:text-cream transition"
+                title="See how this score breaks down"
+              >
+                {row.points}
+              </button>
+              {isOwner && (
+                <div className="flex items-center gap-1 flex-none">
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "ADD" })}
+                    title="Add points"
+                    aria-label={`Add points to ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SUBTRACT" })}
+                    title="Subtract points"
+                    aria-label={`Subtract points from ${row.member.user.name}`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => setAdjustTarget({ memberId: row.member.id, mode: "SET" })}
+                    title="Set total score"
+                    aria-label={`Set ${row.member.user.name}'s total score`}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-cream/15 text-cream/60 hover:border-pink hover:text-pink transition"
+                  >
+                    =
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <ScoreBreakdownModal
+          memberName={selected.member.user.name}
+          totalPoints={selected.points}
+          groups={selected.groups}
+          onClose={() => setSelectedMemberId(null)}
+        />
+      )}
+
+      {adjustTarget && adjusting && (
+        <AdjustScoreModal
+          leagueId={league.id}
+          memberId={adjusting.member.id}
+          memberName={adjusting.member.user.name}
+          mode={adjustTarget.mode}
+          currentTotal={adjusting.points}
+          onClose={() => setAdjustTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// WEEKLY_CATEGORIES (Bake Off) — no winner/final-four pick, just a weekly
+// Star Baker/technical winner/voted off prediction scored against the
+// admin's weekly answer key (see lib/bake-off-scoring.ts). Layout and
+// commissioner-adjustment actions otherwise match the other leaderboards.
+function BakeOffLeaderboard({
+  league,
+  currentUserId,
+  isOwner,
+}: {
+  league: League;
+  currentUserId: string;
+  isOwner: boolean;
+}) {
+  const template = league.template;
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<{ memberId: string; mode: AdjustMode } | null>(null);
+  if (!template) return null;
+
+  const hasAnyResults = template.weeklyResults.length > 0;
+
+  const standings = league.members
+    .map((m) => {
+      const groups = breakdownCategoryMember({
+        picks: m.categoryPicks,
+        results: template.weeklyResults.map((r) => ({
+          ...r,
+          handshakes: (r.handshakes as Record<string, number> | null) ?? {},
+        })),
+        adjustments: m.adjustments.map((a) => ({ points: a.points, note: a.note })),
+      });
+      return { member: m, groups, points: groups.reduce((sum, g) => sum + g.total, 0) };
+    })
+    .sort((a, b) => b.points - a.points);
+
+  if (!hasAnyResults) {
+    return <ComingSoon title="LEAGUE TABLE" text="Standings show up here once scoring starts." />;
+  }
+
+  const selected = standings.find((s) => s.member.id === selectedMemberId);
+  const adjusting = standings.find((s) => s.member.id === adjustTarget?.memberId);
+
+  const scoredWeeks = [...template.weeklyResults].sort((a, b) => a.week - b.week);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="bg-card border border-cream/10 rounded-3xl p-6">
+        <h3 className="font-display text-lg tracking-wide mb-3">RESULTS SO FAR</h3>
+        <div className="flex flex-col gap-2">
+          {scoredWeeks.map((r) => (
+            <p key={r.week} className="text-sm text-cream/70">
+              <span className="text-cream/45">Week {r.week}:</span> Star Baker — {r.actualStarBaker ?? "—"}, Technical
+              winner — {r.actualTechnicalWinner ?? "—"}, Voted off — {r.actualVotedOff ?? "—"}
+            </p>
+          ))}
+        </div>
+      </div>
 
       <div className="bg-card border border-cream/10 rounded-3xl p-2">
         {standings.map((row, i) => {
