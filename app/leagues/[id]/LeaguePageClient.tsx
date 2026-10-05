@@ -417,7 +417,7 @@ export function LeaguePageClient({
         <TabButton active={tab === "details"} onClick={() => setTab("details")}>
           Details
         </TabButton>
-        {league.template?.pickFormat === "WEEKLY_TOP3" && (
+        {(league.template?.pickFormat === "WEEKLY_TOP3" || league.template?.pickFormat === "WEEKLY_CATEGORIES") && (
           <TabButton active={tab === "submissions"} onClick={() => setTab("submissions")}>
             Submissions
           </TabButton>
@@ -1581,14 +1581,15 @@ function SubmissionsTab({
   const [seasonOpen, setSeasonOpen] = useState(false);
   const [songSaving, setSongSaving] = useState(false);
   const me = members.find((m) => m.id === myMembershipId);
-  const myPick = me?.weeklyPicks.find((p) => p.week === week);
+  const myPick = isGbbo ? me?.categoryPicks.find((p) => p.week === week) : me?.weeklyPicks.find((p) => p.week === week);
   // Normally you have to submit your own picks to see everyone else's —
   // an admin previewing a league they're not a member of has nothing to
   // submit, so that gate would otherwise make the preview useless.
   const unlocked = !!myPick || isAdminPreview;
   // Survivor has no season-winner pick — just the top four. Traitors is
-  // the opposite — just the winnerPick, no final four. Neither
-  // "submitted" check can require both the way DWTS's does.
+  // the opposite — just the winnerPick, no final four. Bake Off has no
+  // season-level prediction at all — just weekly category picks — so
+  // its "SEASON PREDICTIONS" panel stays hidden entirely.
   function hasSeasonPrediction(m: Member) {
     if (isSurvivor) return m.finalFourPicks.length === 4;
     if (isTraitors) return !!m.winnerPick;
@@ -1653,6 +1654,7 @@ function SubmissionsTab({
         </div>
       </div>
 
+      {!isGbbo && (
       <div className="mb-5">
         <Panel
           title="SEASON PREDICTIONS"
@@ -1703,6 +1705,7 @@ function SubmissionsTab({
           )}
         </Panel>
       </div>
+      )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
         <div>
@@ -1789,10 +1792,11 @@ function SubmissionsTab({
 
           <div className="flex flex-col gap-2.5">
             <h3 className="font-display text-base tracking-wide text-cream/60">
-              {isTraitors ? "PICKS" : "TOP THREE"}
+              {isTraitors || isGbbo ? "PICKS" : "TOP THREE"}
             </h3>
             {members.map((m) => {
-              const pick = m.weeklyPicks.find((p) => p.week === week);
+              const pick = isGbbo ? null : m.weeklyPicks.find((p) => p.week === week);
+              const categoryPick = isGbbo ? m.categoryPicks.find((p) => p.week === week) : null;
               const isMe = m.id === myMembershipId;
               return (
                 <div
@@ -1803,7 +1807,17 @@ function SubmissionsTab({
                     <span className="font-display text-lg tracking-wide">{m.user.name}</span>
                     {isMe && <span className="text-[10px] font-bold tracking-widest text-pink">YOU</span>}
                   </div>
-                  {pick ? (
+                  {isGbbo ? (
+                    categoryPick ? (
+                      <ol className="flex flex-col gap-1 text-sm text-cream/78">
+                        <li>Star Baker: {categoryPick.starBakerPick || "—"}</li>
+                        <li>Wins the technical: {categoryPick.technicalPick || "—"}</li>
+                        <li>Voted off: {categoryPick.votedOffPick || "—"}</li>
+                      </ol>
+                    ) : (
+                      <p className="text-sm text-cream/40">Not submitted yet.</p>
+                    )
+                  ) : pick ? (
                     isTraitors ? (
                       <ol className="flex flex-col gap-1 text-sm text-cream/78">
                         <li>Traitor to survive: {pick.topThree[0] || "—"}</li>
