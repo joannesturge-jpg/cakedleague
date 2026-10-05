@@ -21,6 +21,7 @@ export type AdminScoringTemplate = {
   weeks: number;
   contestants: string[];
   eliminatedContestants: string[];
+  eliminatedAtWeek: unknown;
   pickFormat: string;
   rules: AdminScoringRule[];
   ruleAwards: AdminRuleAward[];
@@ -63,8 +64,18 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
   const [error, setError] = useState("");
 
   const template = templates.find((t) => t.id === templateId) ?? null;
+  // A contestant eliminated during week W stays selectable in that same
+  // week's other scoring (they were still in the episode) but drops out
+  // starting week W+1. Contestants eliminated before this feature shipped
+  // have no recorded week — treat them as gone for good, matching how
+  // they already behaved.
+  const eliminatedAtWeek = (template?.eliminatedAtWeek as Record<string, number> | null) ?? {};
   const activeContestants =
-    template?.contestants.filter((c) => !template.eliminatedContestants.includes(c)) ?? [];
+    template?.contestants.filter((c) => {
+      if (!template.eliminatedContestants.includes(c)) return true;
+      const elimWeek = eliminatedAtWeek[c];
+      return elimWeek != null && elimWeek >= week;
+    }) ?? [];
 
   function isAwarded(ruleId: string, contestant: string) {
     return !!template?.ruleAwards.some((a) => a.ruleId === ruleId && a.week === week && a.contestant === contestant);
@@ -190,14 +201,20 @@ export function AdminScoring({ templates }: { templates: AdminScoringTemplate[] 
     const key = `eliminate:${contestant}`;
     setBusyKey(key);
     setError("");
-    const next = template.eliminatedContestants.includes(contestant)
+    const wasEliminated = template.eliminatedContestants.includes(contestant);
+    const next = wasEliminated
       ? template.eliminatedContestants.filter((c) => c !== contestant)
       : [...template.eliminatedContestants, contestant];
+    // Record the week they're being eliminated as of — lets this same
+    // week's other scoring still include them, while future weeks don't.
+    const nextAtWeek = { ...((template.eliminatedAtWeek as Record<string, number> | null) ?? {}) };
+    if (wasEliminated) delete nextAtWeek[contestant];
+    else nextAtWeek[contestant] = week;
     try {
       const res = await fetch(`/api/admin/templates/${template.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eliminatedContestants: next }),
+        body: JSON.stringify({ eliminatedContestants: next, eliminatedAtWeek: nextAtWeek }),
       });
       if (!res.ok) throw new Error("Couldn't update that");
       router.refresh();

@@ -43,6 +43,11 @@ model LeagueTemplate {
   createdAt      DateTime @default(now())
   contestants           String[] @default([])
   eliminatedContestants String[] @default([])
+  // Contestant name -> the week they were eliminated, set alongside
+  // eliminatedContestants. Lets scoring still offer an eliminated
+  // contestant in that same week's other selections (they were still in
+  // the episode) while excluding them starting the following week.
+  eliminatedAtWeek      Json     @default("{}")
   tag                   String?
   // WEEKLY_TOP3 (DWTS) answer key, filled in by admin once the real
   // results are known. Each locks after its first save — see

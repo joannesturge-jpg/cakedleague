@@ -18,6 +18,7 @@ export type AdminTemplateRow = {
   rules: AdminTemplateRule[];
   contestants: string[];
   eliminatedContestants: string[];
+  eliminatedAtWeek: unknown;
   tag: string | null;
   draftOpenDay: string | null;
   draftOpenTime: string | null;
