@@ -46,9 +46,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const pool = league.template?.contestants ?? [];
   const eliminated = league.template?.eliminatedContestants ?? [];
+  const eliminatedAtWeek = (league.template?.eliminatedAtWeek as Record<string, number> | null) ?? {};
   for (const c of topThree) {
     if (!pool.includes(c)) return NextResponse.json({ error: `${c} isn't in this league's pool` }, { status: 400 });
-    if (eliminated.includes(c)) return NextResponse.json({ error: `${c} has been eliminated` }, { status: 400 });
+    if (eliminated.includes(c)) {
+      // Eliminated this same week is still a valid pick (e.g. predicting
+      // this week's elimination) — only block someone already gone
+      // before this week started.
+      const elimWeek = eliminatedAtWeek[c];
+      const stillInPlayThisWeek = elimWeek != null && elimWeek >= week;
+      if (!stillInPlayThisWeek) {
+        return NextResponse.json({ error: `${c} has been eliminated` }, { status: 400 });
+      }
+    }
   }
 
   const pick = await prisma.leagueMemberWeeklyPick.upsert({
