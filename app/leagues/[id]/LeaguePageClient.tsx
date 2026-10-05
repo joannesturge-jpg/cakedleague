@@ -833,8 +833,9 @@ function WeeklyPicksForm({
   const [selectedWeek, setSelectedWeek] = useState(() => {
     const scoredWeeks = template?.weeklyScores.map((s) => s.week) ?? [];
     const nextWeek = (scoredWeeks.length ? Math.max(...scoredWeeks) : 0) + 1;
-    // Traitors skips week 1 — picks start week 2.
-    const minWeek = template?.tag === "TRTRS" ? 2 : 1;
+    // Traitors skips week 1 — picks start week 2. Survivor's week 2 is
+    // done, so new viewers land on week 3.
+    const minWeek = template?.tag === "TRTRS" ? 2 : template?.tag === "SRVR" ? 3 : 1;
     return Math.min(Math.max(nextWeek, minWeek), weeks || 1);
   });
   const [showContestants, setShowContestants] = useState(false);
@@ -1361,10 +1362,12 @@ function CategoryPicksForm({
   categoryError: string;
   onSubmitCategory: (week: number, draft: CategoryDraft) => Promise<boolean>;
 }) {
-  const [selectedWeek, setSelectedWeek] = useState(weeks >= 2 ? 2 : 1);
+  // Week 2's done — new viewers land on week 3.
+  const defaultWeek = weeks >= 3 ? 3 : weeks >= 2 ? 2 : 1;
+  const [selectedWeek, setSelectedWeek] = useState(defaultWeek);
   const [showContestants, setShowContestants] = useState(false);
 
-  const startingPick = categoryPicks.find((p) => p.week === 1);
+  const startingPick = categoryPicks.find((p) => p.week === defaultWeek);
   const [draft, setDraft] = useState<CategoryDraft>({
     starBaker: startingPick?.starBakerPick ?? "",
     technical: startingPick?.technicalPick ?? "",
@@ -1554,13 +1557,14 @@ function SubmissionsTab({
 }) {
   const isSurvivor = tag === "SRVR";
   const isTraitors = tag === "TRTRS";
+  const isGbbo = pickFormat === "WEEKLY_CATEGORIES";
   const router = useRouter();
   // Same "next unscored week" default as the pick form — once a week's
   // scored, there's no reason to land on it instead of the current one.
   const [week, setWeek] = useState(() => {
     const scoredWeeks = weeklyScores.map((s) => s.week);
     const nextWeek = (scoredWeeks.length ? Math.max(...scoredWeeks) : 0) + 1;
-    const minWeek = isTraitors ? 2 : 1;
+    const minWeek = isTraitors ? 2 : isSurvivor || isGbbo ? 3 : 1;
     return Math.min(Math.max(nextWeek, minWeek), weeks || 1);
   });
   const [seasonOpen, setSeasonOpen] = useState(false);
