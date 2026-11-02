@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export type AdminLeagueRow = {
   id: string;
@@ -27,9 +28,25 @@ export function AdminLeagues({
   leagues: AdminLeagueRow[];
   templateNameById: Record<string, string>;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [tagFilter, setTagFilter] = useState<string>("All");
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  async function restore(id: string) {
+    setRestoringId(id);
+    try {
+      const res = await fetch(`/api/admin/leagues/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restore: true }),
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setRestoringId(null);
+    }
+  }
 
   // Leagues showing the same tag/template name can still point at
   // different LeagueTemplate rows if more than one was ever created for
@@ -210,8 +227,17 @@ export function AdminLeagues({
                   {l.templateId && <span className="text-[#B4B9C2]"> ({l.templateId})</span>}
                 </span>
                 <span className="text-sm">{l._count.members}</span>
-                <span>
+                <span className="flex items-center gap-2">
                   <StatusBadge status={status} />
+                  {status === "Deleted" && (
+                    <button
+                      onClick={() => restore(l.id)}
+                      disabled={restoringId === l.id}
+                      className="text-[11px] font-semibold text-purple hover:text-[#5B1FBF] transition disabled:opacity-50"
+                    >
+                      {restoringId === l.id ? "Restoring…" : "Restore"}
+                    </button>
+                  )}
                 </span>
               </div>
             );

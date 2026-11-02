@@ -353,6 +353,23 @@ function UserDetailModal({
   templateNameById: Record<string, string>;
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  async function restore(id: string) {
+    setRestoringId(id);
+    try {
+      const res = await fetch(`/api/admin/leagues/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restore: true }),
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
@@ -392,26 +409,37 @@ function UserDetailModal({
         ) : (
           <div className="flex flex-col gap-2">
             {user.memberships.map((m) => (
-              <a
+              <div
                 key={m.league.id}
-                href={leagueUrl(m.league.id)}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open this league's overview page"
-                className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-md border border-[#E2E4E9] hover:border-purple transition"
+                className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-md border border-[#E2E4E9]"
               >
-                <div className="min-w-0">
+                <a
+                  href={leagueUrl(m.league.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open this league's overview page"
+                  className="min-w-0 hover:opacity-80 transition"
+                >
                   <div className="text-sm font-semibold text-[#16181D] truncate">{m.league.name}</div>
                   <div className="text-xs text-[#8A909B] truncate">
                     {m.league.templateId ? templateNameById[m.league.templateId] ?? "Unknown template" : "Custom league"}
                     {m.league.tag ? ` · ${m.league.tag}` : ""}
                   </div>
-                </div>
+                </a>
                 <div className="flex-none flex items-center gap-1.5">
                   {m.league.deletedAt && (
-                    <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-[#FDF2F4] text-[#C2314E]">
-                      DELETED
-                    </span>
+                    <>
+                      <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-[#FDF2F4] text-[#C2314E]">
+                        DELETED
+                      </span>
+                      <button
+                        onClick={() => restore(m.league.id)}
+                        disabled={restoringId === m.league.id}
+                        className="text-[11px] font-semibold text-purple hover:text-[#5B1FBF] transition disabled:opacity-50"
+                      >
+                        {restoringId === m.league.id ? "Restoring…" : "Restore"}
+                      </button>
+                    </>
                   )}
                   <span
                     className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
@@ -421,7 +449,7 @@ function UserDetailModal({
                     {m.role === "OWNER" ? "COMMISSIONER" : "MEMBER"}
                   </span>
                 </div>
-              </a>
+              </div>
             ))}
           </div>
         )}
