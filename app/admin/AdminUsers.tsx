@@ -354,26 +354,33 @@ function UserDetailModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
-  async function restore(id: string) {
-    setRestoringId(id);
+  const selected = user.memberships.find((m) => m.league.id === selectedLeagueId) ?? null;
+
+  async function runAction(action: "restore" | "delete") {
+    if (!selected) return;
+    if (action === "delete" && !confirm(`Delete "${selected.league.name}"? The commissioner can restore it later.`)) {
+      return;
+    }
+    setActionBusy(true);
     try {
-      const res = await fetch(`/api/admin/leagues/${id}`, {
+      const res = await fetch(`/api/admin/leagues/${selected.league.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restore: true }),
+        body: JSON.stringify({ [action]: true }),
       });
       if (res.ok) router.refresh();
     } finally {
-      setRestoringId(null);
+      setActionBusy(false);
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-white border border-[#E2E4E9] rounded-lg p-6"
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-white border border-[#E2E4E9] rounded-lg p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 mb-0.5">
@@ -408,49 +415,81 @@ function UserDetailModal({
           <p className="text-sm text-[#6B7280]">Not in any leagues.</p>
         ) : (
           <div className="flex flex-col gap-2">
-            {user.memberships.map((m) => (
-              <div
-                key={m.league.id}
-                className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-md border border-[#E2E4E9]"
-              >
-                <a
-                  href={leagueUrl(m.league.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open this league's overview page"
-                  className="min-w-0 hover:opacity-80 transition"
+            {user.memberships.map((m) => {
+              const isSelected = selectedLeagueId === m.league.id;
+              return (
+                <label
+                  key={m.league.id}
+                  className={`flex items-center gap-3 px-3.5 py-3 rounded-md border cursor-pointer transition ${
+                    isSelected ? "border-purple bg-purple/5" : "border-[#E2E4E9] hover:border-purple/50"
+                  }`}
                 >
-                  <div className="text-sm font-semibold text-[#16181D] truncate">{m.league.name}</div>
-                  <div className="text-xs text-[#8A909B] truncate">
-                    {m.league.templateId ? templateNameById[m.league.templateId] ?? "Unknown template" : "Custom league"}
-                    {m.league.tag ? ` · ${m.league.tag}` : ""}
+                  <input
+                    type="radio"
+                    name="league-select"
+                    checked={isSelected}
+                    onChange={() => setSelectedLeagueId(m.league.id)}
+                    className="flex-none w-4 h-4 accent-purple"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-[#16181D] truncate">{m.league.name}</div>
+                    <div className="text-xs text-[#8A909B] truncate">
+                      {m.league.templateId ? templateNameById[m.league.templateId] ?? "Unknown template" : "Custom league"}
+                      {m.league.tag ? ` · ${m.league.tag}` : ""}
+                    </div>
                   </div>
-                </a>
-                <div className="flex-none flex items-center gap-1.5">
-                  {m.league.deletedAt && (
-                    <>
+                  <div className="flex-none flex items-center gap-1.5">
+                    {m.league.deletedAt && (
                       <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-[#FDF2F4] text-[#C2314E]">
                         DELETED
                       </span>
-                      <button
-                        onClick={() => restore(m.league.id)}
-                        disabled={restoringId === m.league.id}
-                        className="text-[11px] font-semibold text-purple hover:text-[#5B1FBF] transition disabled:opacity-50"
-                      >
-                        {restoringId === m.league.id ? "Restoring…" : "Restore"}
-                      </button>
-                    </>
-                  )}
-                  <span
-                    className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
-                      m.role === "OWNER" ? "bg-[#F1E9FE] text-[#5B1FBF]" : "bg-[#F1F2F5] text-[#5B6270]"
-                    }`}
-                  >
-                    {m.role === "OWNER" ? "COMMISSIONER" : "MEMBER"}
-                  </span>
-                </div>
-              </div>
-            ))}
+                    )}
+                    <span
+                      className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
+                        m.role === "OWNER" ? "bg-[#F1E9FE] text-[#5B1FBF]" : "bg-[#F1F2F5] text-[#5B6270]"
+                      }`}
+                    >
+                      {m.role === "OWNER" ? "COMMISSIONER" : "MEMBER"}
+                    </span>
+                    <a
+                      href={leagueUrl(m.league.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open this league's overview page"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[11px] font-semibold text-[#5B6270] hover:text-purple transition"
+                    >
+                      Open ↗
+                    </a>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
+
+        {selected && (
+          <div className="mt-4 pt-4 border-t border-[#E2E4E9] flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-[#5B6270] min-w-0 truncate">
+              Selected: <span className="font-semibold text-[#16181D]">{selected.league.name}</span>
+            </p>
+            {selected.league.deletedAt ? (
+              <button
+                onClick={() => runAction("restore")}
+                disabled={actionBusy}
+                className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-50"
+              >
+                {actionBusy ? "Restoring…" : "Restore league"}
+              </button>
+            ) : (
+              <button
+                onClick={() => runAction("delete")}
+                disabled={actionBusy}
+                className="px-4 py-2 rounded-md bg-[#C2314E] text-white text-[13px] font-bold disabled:opacity-50"
+              >
+                {actionBusy ? "Deleting…" : "Delete league"}
+              </button>
+            )}
           </div>
         )}
       </div>
