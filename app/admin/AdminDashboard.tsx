@@ -78,10 +78,9 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
         isBlocked: true,
         _count: { select: { leagues: { where: { isActive: true, deletedAt: null } } } },
         memberships: {
-          where: { league: { deletedAt: null } },
           select: {
             role: true,
-            league: { select: { id: true, name: true, tag: true, templateId: true } },
+            league: { select: { id: true, name: true, tag: true, templateId: true, deletedAt: true } },
           },
         },
       },

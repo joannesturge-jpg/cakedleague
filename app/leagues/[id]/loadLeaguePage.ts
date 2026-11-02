@@ -26,7 +26,7 @@ export async function loadLeaguePage(id: string) {
     },
   });
 
-  if (!league || league.deletedAt) return { kind: "not-found" as const };
+  if (!league) return { kind: "not-found" as const };
 
   const isMember = league.members.some((m) => m.userId === user.id);
   const isOwner = league.ownerId === user.id;
@@ -35,6 +35,11 @@ export async function loadLeaguePage(id: string) {
   // — not the same as being a member, so isOwner stays accurate and
   // owner-only controls stay hidden unless they actually own it too.
   if (!isMember && !isOwner && !user.isAdmin) return { kind: "forbidden" as const };
+
+  // A deleted league stays gone for everyone it looks deleted to — only
+  // an admin can still open it, to investigate a "my league disappeared"
+  // report (e.g. check it's the right one before deciding to restore it).
+  if (league.deletedAt && !user.isAdmin) return { kind: "not-found" as const };
 
   return {
     kind: "ok" as const,

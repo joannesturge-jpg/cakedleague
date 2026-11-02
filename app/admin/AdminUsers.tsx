@@ -12,7 +12,7 @@ export type AdminUserRow = {
   _count: { leagues: number };
   memberships: {
     role: string;
-    league: { id: string; name: string; tag: string | null; templateId: string | null };
+    league: { id: string; name: string; tag: string | null; templateId: string | null; deletedAt: Date | null };
   }[];
 };
 
@@ -407,13 +407,20 @@ function UserDetailModal({
                     {m.league.tag ? ` · ${m.league.tag}` : ""}
                   </div>
                 </div>
-                <span
-                  className={`flex-none text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
-                    m.role === "OWNER" ? "bg-[#F1E9FE] text-[#5B1FBF]" : "bg-[#F1F2F5] text-[#5B6270]"
-                  }`}
-                >
-                  {m.role === "OWNER" ? "COMMISSIONER" : "MEMBER"}
-                </span>
+                <div className="flex-none flex items-center gap-1.5">
+                  {m.league.deletedAt && (
+                    <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-[#FDF2F4] text-[#C2314E]">
+                      DELETED
+                    </span>
+                  )}
+                  <span
+                    className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
+                      m.role === "OWNER" ? "bg-[#F1E9FE] text-[#5B1FBF]" : "bg-[#F1F2F5] text-[#5B6270]"
+                    }`}
+                  >
+                    {m.role === "OWNER" ? "COMMISSIONER" : "MEMBER"}
+                  </span>
+                </div>
               </a>
             ))}
           </div>

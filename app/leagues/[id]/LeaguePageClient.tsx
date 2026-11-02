@@ -85,6 +85,7 @@ type League = {
   name: string;
   glyph: string;
   description: string | null;
+  deletedAt: string | Date | null;
   visibility: string;
   inviteCode: string;
   weeks: number | null;
@@ -384,6 +385,13 @@ export function LeaguePageClient({
 
   return (
     <div className="px-5 sm:px-10 py-8 sm:py-11 pb-20 max-w-[57.6rem] mx-auto">
+      {league.deletedAt && (
+        <div className="mb-6 px-4 py-3 rounded-2xl bg-pink/15 border border-pink/40 text-sm text-pink font-semibold">
+          This league was deleted{" "}
+          {new Date(league.deletedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} —
+          you&apos;re viewing it as an admin. Members can no longer see it.
+        </div>
+      )}
       <div className="flex gap-6 items-center flex-wrap mb-8">
         <div
           className="w-[100px] h-[100px] rounded-3xl flex-none flex items-center justify-center text-5xl shadow-[0_18px_44px_rgba(123,44,245,.34)]"
