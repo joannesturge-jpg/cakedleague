@@ -9,6 +9,7 @@ export type AdminLeagueRow = {
   templateId: string | null;
   isActive: boolean;
   deletedAt: Date | null;
+  deletedBy: { name: string; email: string } | null;
   _count: { members: number };
 };
 
@@ -227,7 +228,16 @@ export function AdminLeagues({
                   {l.templateId && <span className="text-[#B4B9C2]"> ({l.templateId})</span>}
                 </span>
                 <span className="text-sm">{l._count.members}</span>
-                <span className="flex items-center gap-2">
+                <span
+                  className="flex items-center gap-2"
+                  title={
+                    status === "Deleted"
+                      ? `Deleted ${l.deletedBy ? `by ${l.deletedBy.name} (${l.deletedBy.email}) ` : ""}${new Date(
+                          l.deletedAt!
+                        ).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}`
+                      : undefined
+                  }
+                >
                   <StatusBadge status={status} />
                   {status === "Deleted" && (
                     <button

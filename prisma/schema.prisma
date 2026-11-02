@@ -24,9 +24,10 @@ model User {
   notifyScoring  Boolean @default(true)
   notifyInvites  Boolean @default(true)
 
-  leagues     League[]
-  memberships LeagueMember[]
-  resetTokens PasswordResetToken[]
+  leagues        League[] @relation("LeagueOwner")
+  deletedLeagues League[] @relation("LeagueDeletedBy")
+  memberships    LeagueMember[]
+  resetTokens    PasswordResetToken[]
 }
 
 model LeagueTemplate {
@@ -169,6 +170,7 @@ model League {
   inviteCode  String    @unique
   createdAt   DateTime  @default(now())
   deletedAt   DateTime?
+  deletedById String?
   tag         String?
 
   weeks          Int?
@@ -193,8 +195,14 @@ model League {
   prizePlaces  Int?
   prizeRules   Json?
 
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner   User   @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId String
+
+  // Who deleted it (commissioner self-delete or admin) — kept around for
+  // support lookups like "who deleted this and when." Nulled instead of
+  // cascading if that user's own account is later removed, since the
+  // league's deleted state shouldn't depend on it.
+  deletedBy User? @relation("LeagueDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
 
   template   LeagueTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   templateId String?

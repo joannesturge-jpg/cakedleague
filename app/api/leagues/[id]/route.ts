@@ -56,6 +56,6 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   // Soft delete — keeps the row (and its history) around for the admin
   // Leagues table instead of erasing it outright.
-  await prisma.league.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+  await prisma.league.update({ where: { id: params.id }, data: { deletedAt: new Date(), deletedById: user.id } });
   return NextResponse.json({ ok: true });
 }

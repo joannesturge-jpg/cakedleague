@@ -27,6 +27,7 @@ import { breakdownTraitorsMember } from "@/lib/traitors-scoring";
 import { breakdownCategoryMember } from "@/lib/bake-off-scoring";
 import { ScoreBreakdownModal } from "./ScoreBreakdownModal";
 import { AdjustScoreModal, type AdjustMode } from "./AdjustScoreModal";
+import { DeleteLeagueConfirmModal } from "./DeleteLeagueConfirmModal";
 
 type Rule = { id: string; label: string; points: number; isCustom: boolean; awards: { memberId: string }[] };
 type WeeklyPick = {
@@ -86,6 +87,7 @@ type League = {
   glyph: string;
   description: string | null;
   deletedAt: string | Date | null;
+  deletedBy: { name: string } | null;
   visibility: string;
   inviteCode: string;
   weeks: number | null;
@@ -148,6 +150,7 @@ export function LeaguePageClient({
   const [membersOpen, setMembersOpen] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy link");
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const myMembership = league.members.find((m) => m.userId === currentUserId);
   const [notifyOn, setNotifyOn] = useState(myMembership?.notifyPicksDue ?? false);
@@ -361,7 +364,6 @@ export function LeaguePageClient({
   }
 
   async function deleteLeague() {
-    if (!confirm(`Delete "${league.name}"? This can't be undone.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/leagues/${league.id}`, { method: "DELETE" });
@@ -387,7 +389,7 @@ export function LeaguePageClient({
     <div className="px-5 sm:px-10 py-8 sm:py-11 pb-20 max-w-[57.6rem] mx-auto">
       {league.deletedAt && (
         <div className="mb-6 px-4 py-3 rounded-2xl bg-pink/15 border border-pink/40 text-sm text-pink font-semibold">
-          This league was deleted{" "}
+          This league was deleted{league.deletedBy ? ` by ${league.deletedBy.name}` : ""}{" "}
           {new Date(league.deletedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} —
           you&apos;re viewing it as an admin. Members can no longer see it.
         </div>
@@ -412,7 +414,7 @@ export function LeaguePageClient({
         </div>
         {isOwner && (
           <button
-            onClick={deleteLeague}
+            onClick={() => setConfirmingDelete(true)}
             disabled={deleting}
             className="text-sm font-semibold text-cream/40 hover:text-pink transition flex-none"
           >
@@ -420,6 +422,15 @@ export function LeaguePageClient({
           </button>
         )}
       </div>
+
+      {confirmingDelete && (
+        <DeleteLeagueConfirmModal
+          leagueName={league.name}
+          busy={deleting}
+          onConfirm={deleteLeague}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
 
       <div className="flex gap-2 flex-wrap mb-6 border-b border-cream/12 pb-0.5">
         <TabButton active={tab === "details"} onClick={() => setTab("details")}>

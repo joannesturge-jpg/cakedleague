@@ -12,7 +12,14 @@ export type AdminUserRow = {
   _count: { leagues: number };
   memberships: {
     role: string;
-    league: { id: string; name: string; tag: string | null; templateId: string | null; deletedAt: Date | null };
+    league: {
+      id: string;
+      name: string;
+      tag: string | null;
+      templateId: string | null;
+      deletedAt: Date | null;
+      deletedBy: { name: string; email: string } | null;
+    };
   }[];
 };
 
@@ -356,14 +363,12 @@ function UserDetailModal({
   const router = useRouter();
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const selected = user.memberships.find((m) => m.league.id === selectedLeagueId) ?? null;
 
   async function runAction(action: "restore" | "delete") {
     if (!selected) return;
-    if (action === "delete" && !confirm(`Delete "${selected.league.name}"? The commissioner can restore it later.`)) {
-      return;
-    }
     setActionBusy(true);
     try {
       const res = await fetch(`/api/admin/leagues/${selected.league.id}`, {
@@ -371,7 +376,10 @@ function UserDetailModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [action]: true }),
       });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+        setConfirmingDelete(false);
+      }
     } finally {
       setActionBusy(false);
     }
@@ -437,6 +445,16 @@ function UserDetailModal({
                       {m.league.templateId ? templateNameById[m.league.templateId] ?? "Unknown template" : "Custom league"}
                       {m.league.tag ? ` · ${m.league.tag}` : ""}
                     </div>
+                    {m.league.deletedAt && (
+                      <div className="text-xs text-[#C2314E] truncate">
+                        Deleted {m.league.deletedBy ? `by ${m.league.deletedBy.name} ` : ""}
+                        {new Date(m.league.deletedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div className="flex-none flex items-center gap-1.5">
                     {m.league.deletedAt && (
@@ -483,15 +501,84 @@ function UserDetailModal({
               </button>
             ) : (
               <button
-                onClick={() => runAction("delete")}
-                disabled={actionBusy}
-                className="px-4 py-2 rounded-md bg-[#C2314E] text-white text-[13px] font-bold disabled:opacity-50"
+                onClick={() => setConfirmingDelete(true)}
+                className="px-4 py-2 rounded-md bg-[#C2314E] text-white text-[13px] font-bold"
               >
-                {actionBusy ? "Deleting…" : "Delete league"}
+                Delete league
               </button>
             )}
           </div>
         )}
+      </div>
+
+      {confirmingDelete && selected && (
+        <DeleteLeagueConfirmModal
+          leagueName={selected.league.name}
+          busy={actionBusy}
+          onConfirm={() => runAction("delete")}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DeleteLeagueConfirmModal({
+  leagueName,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  leagueName: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-md bg-white border border-[#E2E4E9] rounded-lg p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h2 className="font-display text-lg tracking-wide">DELETE &quot;{leagueName}&quot;?</h2>
+          <button onClick={onCancel} className="flex-none text-[#8A909B] hover:text-[#16181D] text-2xl leading-none">
+            &times;
+          </button>
+        </div>
+        <p className="text-sm text-[#5B6270] mb-4">
+          This can be undone later from this same screen, but the commissioner and every member will lose access to
+          it until someone restores it.
+        </p>
+        <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+            className="mt-0.5 flex-none w-4 h-4 accent-[#C2314E]"
+          />
+          <span className="text-sm text-[#16181D]">
+            I understand this league will be deleted and the commissioner won&apos;t be able to access it in the
+            future.
+          </span>
+        </label>
+        <div className="flex items-center justify-end gap-2.5">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-md border border-[#D6D9E0] text-[#5B6270] text-[13px] font-semibold hover:border-purple transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!acknowledged || busy}
+            className="px-4 py-2 rounded-md bg-[#C2314E] text-white text-[13px] font-bold disabled:opacity-40"
+          >
+            {busy ? "Deleting…" : "Delete league"}
+          </button>
+        </div>
       </div>
     </div>
   );

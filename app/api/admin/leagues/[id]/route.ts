@@ -15,11 +15,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
 
   if (body.restore === true) {
-    await prisma.league.update({ where: { id: params.id }, data: { deletedAt: null } });
+    await prisma.league.update({ where: { id: params.id }, data: { deletedAt: null, deletedById: null } });
     return NextResponse.json({ ok: true });
   }
   if (body.delete === true) {
-    await prisma.league.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+    await prisma.league.update({ where: { id: params.id }, data: { deletedAt: new Date(), deletedById: admin.id } });
     return NextResponse.json({ ok: true });
   }
 

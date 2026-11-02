@@ -80,7 +80,16 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
         memberships: {
           select: {
             role: true,
-            league: { select: { id: true, name: true, tag: true, templateId: true, deletedAt: true } },
+            league: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                templateId: true,
+                deletedAt: true,
+                deletedBy: { select: { name: true, email: true } },
+              },
+            },
           },
         },
       },
@@ -105,6 +114,7 @@ export async function AdminDashboard({ initialTab = "users" }: { initialTab?: Ad
         tag: true,
         isActive: true,
         deletedAt: true,
+        deletedBy: { select: { name: true, email: true } },
         createdAt: true,
         visibility: true,
         templateId: true,

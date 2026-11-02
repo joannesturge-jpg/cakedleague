@@ -1,0 +1,4 @@
+ALTER TABLE "League" ADD COLUMN "deletedById" TEXT;
+
+ALTER TABLE "League" ADD CONSTRAINT "League_deletedById_fkey"
+  FOREIGN KEY ("deletedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

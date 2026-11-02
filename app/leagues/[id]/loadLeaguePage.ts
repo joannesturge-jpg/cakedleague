@@ -23,6 +23,7 @@ export async function loadLeaguePage(id: string) {
       },
       template: { include: { weeklyScores: true, weeklyResults: true, ruleAwards: { include: { rule: true } } } },
       picks: true,
+      deletedBy: { select: { name: true } },
     },
   });
 
