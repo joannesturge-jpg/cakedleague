@@ -94,6 +94,16 @@ function calendarDate(year: number, month: number, day: number) {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
+// One-time calendar-date override for a template's very next due date —
+// for a week the real show schedule shifts off its usual weekday (e.g.
+// holiday-week scheduling), same due time, just a different day. Keyed
+// by template tag. Stops applying as soon as its own date+time passes,
+// so the following occurrence falls back to the normal recurring
+// weekday automatically — no manual cleanup needed.
+const NEXT_DUE_DATE_OVERRIDE: Record<string, string> = {
+  DWTS: "2026-11-02",
+};
+
 // The next real calendar date+time picks are due, in the league's own
 // zone — always strictly in the future. If today is the due day, this
 // only rolls to next week when the due time has already passed today; a
@@ -110,11 +120,22 @@ export function nextDueDate(
   dueTime: string,
   timezone: string,
   from: Date = new Date(),
-  notBefore?: Date | null
+  notBefore?: Date | null,
+  tag?: string | null
 ) {
+  const [dueH, dueM] = dueTime.split(":").map(Number);
+
+  const overrideDate = tag ? NEXT_DUE_DATE_OVERRIDE[tag] : undefined;
+  if (overrideDate) {
+    const [oy, om, od] = overrideDate.split("-").map(Number);
+    const overrideInstant = zonedInstant(oy, om, od, dueH, dueM, timezone);
+    if (overrideInstant.getTime() > from.getTime()) {
+      return calendarDate(oy, om, od);
+    }
+  }
+
   const targetDay = WEEKDAY_INDEX[dueDay];
   if (targetDay === undefined) return null;
-  const [dueH, dueM] = dueTime.split(":").map(Number);
 
   const now = zonedParts(from, timezone);
   const today = calendarDate(now.year, now.month, now.day);
@@ -146,9 +167,10 @@ export function formatNextDueDate(
   dueTime: string,
   timezone: string,
   from: Date = new Date(),
-  notBefore?: Date | null
+  notBefore?: Date | null,
+  tag?: string | null
 ) {
-  const date = nextDueDate(dueDay, dueTime, timezone, from, notBefore);
+  const date = nextDueDate(dueDay, dueTime, timezone, from, notBefore, tag);
   if (!date) return formatDueDate(dueDay, dueTime);
   const weekday = date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
   const month = date.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });

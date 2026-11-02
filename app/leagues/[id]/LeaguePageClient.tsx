@@ -510,7 +510,8 @@ export function LeaguePageClient({
                       dueTime,
                       timezone,
                       new Date(),
-                      league.startDate ? new Date(league.startDate) : null
+                      league.startDate ? new Date(league.startDate) : null,
+                      league.template?.tag
                     )}{" "}
                     {TIMEZONE_ABBR[timezone] ?? ""}
                   </div>
