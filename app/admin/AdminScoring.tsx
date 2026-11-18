@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { countWord } from "@/lib/leagues";
 
 export type AdminRuleAward = { id: string; week: number; contestant: string; ruleId: string };
 export type AdminWeeklyScore = { id: string; week: number; contestant: string; score: number };
@@ -29,6 +30,7 @@ export type AdminScoringTemplate = {
   weeklyResults: AdminWeeklyResult[];
   weekThemes: unknown;
   actualFinalFour: string[];
+  finalCount: number;
   actualWinner: string | null;
 };
 
@@ -962,9 +964,11 @@ function SeasonPredictionsAnswerKey({
   // field with "Traitors" / "Faithfuls" as its two possible values.
   const isTraitors = template.tag === "TRTRS";
 
+  const finalCount = template.finalCount;
+
   function toggle(c: string) {
     setPicking((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : prev.length < 4 ? [...prev, c] : prev
+      prev.includes(c) ? prev.filter((x) => x !== c) : prev.length < finalCount ? [...prev, c] : prev
     );
   }
 
@@ -975,16 +979,16 @@ function SeasonPredictionsAnswerKey({
       </div>
       <p className="text-xs text-[#8A909B] mb-3">
         {isSurvivor
-          ? "Can only be set once — pick it whenever the real result is known. Members predicted their top four for +5 points each, before week one."
+          ? `Can only be set once — pick it whenever the real result is known. Members predicted their top ${countWord(finalCount)} for +5 points each, before week one.`
           : isTraitors
             ? "Can only be set once — pick it whenever the real result is known. Members predicted Traitors or Faithfuls for +5 points, before week one."
-            : "Each of these can only be set once — pick them whenever the real result is known. Members predicted the final four for +5 points each and the season winner once, before week one."}
+            : `Each of these can only be set once — pick them whenever the real result is known. Members predicted the final ${countWord(finalCount)} for +5 points each and the season winner once, before week one.`}
       </p>
 
       {!isTraitors && (
         <div className="mb-4">
           <div className="text-[13px] font-semibold text-[#16181D] mb-2">
-            Actual final four {finalFourLocked ? "" : `(${picking.length}/4)`}
+            Actual final {countWord(finalCount)} {finalFourLocked ? "" : `(${picking.length}/${finalCount})`}
           </div>
           {finalFourLocked ? (
             <div className="flex flex-wrap gap-1.5">
@@ -1020,10 +1024,10 @@ function SeasonPredictionsAnswerKey({
               </div>
               <button
                 onClick={() => onSaveActualResults({ actualFinalFour: picking })}
-                disabled={picking.length !== 4 || busyKey === "actual:finalFour"}
+                disabled={picking.length !== finalCount || busyKey === "actual:finalFour"}
                 className="px-4 py-2 rounded-md bg-purple text-white text-[13px] font-bold disabled:opacity-40"
               >
-                {busyKey === "actual:finalFour" ? "Locking in…" : "Lock in final four"}
+                {busyKey === "actual:finalFour" ? "Locking in…" : `Lock in final ${countWord(finalCount)}`}
               </button>
             </>
           )}

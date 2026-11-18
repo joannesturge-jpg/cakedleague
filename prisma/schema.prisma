@@ -55,6 +55,11 @@ model LeagueTemplate {
   // /api/admin/templates/[id]/actual-results.
   actualFinalFour       String[] @default([])
   actualWinner          String?
+  // How many picks the pre-season "final four" prediction actually asks
+  // for — named after the common case, but a season can run a final five
+  // (or any other size) instead, so the real pick count lives here rather
+  // than being assumed as 4 everywhere.
+  finalCount            Int      @default(4)
   // Assumed Pacific time — matches the picks-due reminder's fixed-timezone
   // approach until leagues store their own timezone.
   draftOpenDay          String?

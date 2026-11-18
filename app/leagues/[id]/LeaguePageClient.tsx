@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DRAFT_MODE_LABELS,
+  countWord,
   formatDueDate,
   formatNextDueDate,
   formatOpenDate,
@@ -70,6 +71,7 @@ type Template = {
   weekThemes: unknown;
   actualWinner: string | null;
   actualFinalFour: string[];
+  finalCount: number;
   weeklyScores: { week: number; contestant: string; score: number }[];
   weeklyResults: {
     week: number;
@@ -668,6 +670,7 @@ export function LeaguePageClient({
           isAdminPreview={isAdminPreview}
           pickFormat={league.template?.pickFormat ?? null}
           tag={league.template?.tag ?? null}
+          finalCount={league.template?.finalCount ?? 4}
           weeklyScores={league.template?.weeklyScores ?? []}
         />
       )}
@@ -886,17 +889,20 @@ function WeeklyPicksForm({
     if (ok) setWinnerEditing(false);
   }
 
-  // Final four — same editable-until-lock pattern as the winner pick.
-  const [fourEditing, setFourEditing] = useState(finalFourPicks.length !== 4);
-  const [draftFour, setDraftFour] = useState<string[]>(finalFourPicks.length === 4 ? finalFourPicks : []);
+  // Final four — same editable-until-lock pattern as the winner pick. (A
+  // season can run a final five, or any other size, instead — finalCount
+  // on the template says how many, defaulting to 4.)
+  const finalCount = template?.finalCount ?? 4;
+  const [fourEditing, setFourEditing] = useState(finalFourPicks.length !== finalCount);
+  const [draftFour, setDraftFour] = useState<string[]>(finalFourPicks.length === finalCount ? finalFourPicks : []);
 
   function toggleFour(c: string) {
     setDraftFour((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : prev.length < 4 ? [...prev, c] : prev
+      prev.includes(c) ? prev.filter((x) => x !== c) : prev.length < finalCount ? [...prev, c] : prev
     );
   }
   function enterFourEdit() {
-    setDraftFour(finalFourPicks.length === 4 ? finalFourPicks : []);
+    setDraftFour(finalFourPicks.length === finalCount ? finalFourPicks : []);
     setFourEditing(true);
   }
   async function saveFour() {
@@ -1086,7 +1092,7 @@ function WeeklyPicksForm({
         <div className="bg-card border border-cream/10 rounded-3xl p-6">
           <div className="flex items-center justify-between gap-3 mb-1.5">
             <h3 className="font-display text-xl tracking-wide">
-              {isSurvivor ? "YOUR TOP FOUR" : "FINAL FOUR PREDICTIONS"}
+              {isSurvivor ? `YOUR TOP ${countWord(finalCount).toUpperCase()}` : `FINAL ${countWord(finalCount).toUpperCase()} PREDICTIONS`}
             </h3>
             {!fourEditing && (
               <button
@@ -1137,10 +1143,10 @@ function WeeklyPicksForm({
               </div>
               <button
                 onClick={saveFour}
-                disabled={draftFour.length !== 4 || finalFourBusy}
+                disabled={draftFour.length !== finalCount || finalFourBusy}
                 className="px-6 py-3 rounded-full bg-purple text-cream font-bold text-sm hover:bg-[#8f47ff] transition disabled:opacity-50"
               >
-                {finalFourBusy ? "Saving…" : `Save (${draftFour.length}/4)`}
+                {finalFourBusy ? "Saving…" : `Save (${draftFour.length}/${finalCount})`}
               </button>
             </>
           )}
@@ -1574,6 +1580,7 @@ function SubmissionsTab({
   isAdminPreview,
   pickFormat,
   tag,
+  finalCount,
   weeklyScores,
 }: {
   leagueId: string;
@@ -1584,6 +1591,7 @@ function SubmissionsTab({
   isAdminPreview: boolean;
   pickFormat: string | null;
   tag: string | null;
+  finalCount: number;
   weeklyScores: { week: number }[];
 }) {
   const isSurvivor = tag === "SRVR";
@@ -1611,9 +1619,9 @@ function SubmissionsTab({
   // season-level prediction at all — just weekly category picks — so
   // its "SEASON PREDICTIONS" panel stays hidden entirely.
   function hasSeasonPrediction(m: Member) {
-    if (isSurvivor) return m.finalFourPicks.length === 4;
+    if (isSurvivor) return m.finalFourPicks.length === finalCount;
     if (isTraitors) return !!m.winnerPick;
-    return !!m.winnerPick && m.finalFourPicks.length === 4;
+    return !!m.winnerPick && m.finalFourPicks.length === finalCount;
   }
   const seasonPredictionsUnlocked = (!!me && hasSeasonPrediction(me)) || isAdminPreview;
   const seasonSubmittedCount = members.filter(hasSeasonPrediction).length;
@@ -1684,7 +1692,8 @@ function SubmissionsTab({
         >
           {!seasonPredictionsUnlocked ? (
             <p className="text-sm text-cream/55">
-              Lock in your season winner and final four picks on the Details tab to see everyone else&apos;s.
+              Lock in your season winner and final {countWord(finalCount)} picks on the Details tab to see everyone
+              else&apos;s.
             </p>
           ) : (
             <div className="flex flex-col gap-1.5">
@@ -1711,7 +1720,7 @@ function SubmissionsTab({
                                 <br />
                               </>
                             )}
-                            Top 4: {m.finalFourPicks.map(celebrityName).join(", ")}
+                            Top {finalCount}: {m.finalFourPicks.map(celebrityName).join(", ")}
                           </>
                         )}
                       </p>
@@ -1936,7 +1945,7 @@ function DwtsLeaderboard({
           )}
           {template.actualFinalFour.length > 0 && (
             <p className="text-sm text-cream/70">
-              <span className="text-cream/45">Final four:</span> {template.actualFinalFour.join(", ")}
+              <span className="text-cream/45">Final {countWord(template.finalCount)}:</span> {template.actualFinalFour.join(", ")}
             </p>
           )}
         </div>
@@ -2079,7 +2088,8 @@ function SurvivorLeaderboard({
         <div className="bg-card border border-cream/10 rounded-3xl p-6">
           <h3 className="font-display text-lg tracking-wide mb-3">RESULTS SO FAR</h3>
           <p className="text-sm text-cream/70">
-            <span className="text-cream/45">Final four:</span> {template.actualFinalFour.join(", ")}
+            <span className="text-cream/45">Final {countWord(template.finalCount)}:</span>{" "}
+            {template.actualFinalFour.join(", ")}
           </p>
         </div>
       )}

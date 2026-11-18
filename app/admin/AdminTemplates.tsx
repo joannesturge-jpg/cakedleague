@@ -37,6 +37,7 @@ export type AdminTemplateRow = {
   weekThemes: unknown;
   actualFinalFour: string[];
   actualWinner: string | null;
+  finalCount: number;
 };
 
 export function AdminTemplates({

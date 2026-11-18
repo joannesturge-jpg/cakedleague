@@ -24,8 +24,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
       (c: unknown): c is string => typeof c === "string" && c.trim().length > 0
     );
     const unique = Array.from(new Set(picks));
-    if (unique.length !== 4) {
-      return NextResponse.json({ error: "Pick exactly 4 contestants for the final four" }, { status: 400 });
+    if (unique.length !== template.finalCount) {
+      return NextResponse.json(
+        { error: `Pick exactly ${template.finalCount} contestants for the final ${template.finalCount}` },
+        { status: 400 }
+      );
     }
     for (const c of unique) {
       if (!template.contestants.includes(c)) {

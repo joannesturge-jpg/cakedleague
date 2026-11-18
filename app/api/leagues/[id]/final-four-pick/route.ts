@@ -3,7 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSeasonPredictionsLocked } from "@/lib/leagues";
 
-// "Final four" prediction for WEEKLY_TOP3 leagues — 4 contestants, +5
+// "Final four" prediction for WEEKLY_TOP3 leagues — finalCount contestants
+// (4, unless the template's season runs a different size final), +5
 // points each if they're right. Freely changeable up until the season
 // predictions lock date — after that isSeasonPredictionsLocked() refuses
 // everything, changes included.
@@ -20,9 +21,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     ? body.picks.filter((c: unknown): c is string => typeof c === "string" && c.trim().length > 0).map((c: string) => c.trim())
     : [];
   const unique = Array.from(new Set(picks));
-  if (unique.length !== 4) {
-    return NextResponse.json({ error: "Pick exactly 4 different contestants" }, { status: 400 });
-  }
 
   const league = await prisma.league.findUnique({ where: { id: params.id }, include: { template: true } });
   if (!league || league.deletedAt) return NextResponse.json({ error: "League not found" }, { status: 404 });
@@ -33,6 +31,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!membership) return NextResponse.json({ error: "Not a member of this league" }, { status: 403 });
 
   if (!league.template) return NextResponse.json({ error: "This league has no contestant pool" }, { status: 400 });
+
+  const finalCount = league.template.finalCount;
+  if (unique.length !== finalCount) {
+    return NextResponse.json({ error: `Pick exactly ${finalCount} different contestants` }, { status: 400 });
+  }
+
   for (const c of unique) {
     if (!league.template.contestants.includes(c)) {
       return NextResponse.json({ error: `${c} isn't in this league's pool` }, { status: 400 });

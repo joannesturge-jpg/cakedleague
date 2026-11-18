@@ -1,5 +1,13 @@
 export const DUE_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
 
+// Most templates run a "final four" pre-season prediction, but a season
+// can run a final five (or any other size) instead — spells the count out
+// in copy like "final five" rather than always saying "four."
+const COUNT_WORDS: Record<number, string> = { 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight" };
+export function countWord(n: number) {
+  return COUNT_WORDS[n] ?? String(n);
+}
+
 export const DUE_DAY_LABELS: Record<string, string> = {
   MONDAY: "Mon",
   TUESDAY: "Tue",
