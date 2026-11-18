@@ -893,8 +893,11 @@ function WeeklyPicksForm({
   // season can run a final five, or any other size, instead — finalCount
   // on the template says how many, defaulting to 4.)
   const finalCount = template?.finalCount ?? 4;
-  const [fourEditing, setFourEditing] = useState(finalFourPicks.length !== finalCount);
-  const [draftFour, setDraftFour] = useState<string[]>(finalFourPicks.length === finalCount ? finalFourPicks : []);
+  // "Has saved picks" means *any* picks, not exactly finalCount — someone
+  // who locked in picks before finalCount changed mid-season still has a
+  // valid, complete submission under the rules at the time they saved.
+  const [fourEditing, setFourEditing] = useState(finalFourPicks.length === 0);
+  const [draftFour, setDraftFour] = useState<string[]>(finalFourPicks);
 
   function toggleFour(c: string) {
     setDraftFour((prev) =>
@@ -902,7 +905,7 @@ function WeeklyPicksForm({
     );
   }
   function enterFourEdit() {
-    setDraftFour(finalFourPicks.length === finalCount ? finalFourPicks : []);
+    setDraftFour(finalFourPicks);
     setFourEditing(true);
   }
   async function saveFour() {
@@ -1619,9 +1622,13 @@ function SubmissionsTab({
   // season-level prediction at all — just weekly category picks — so
   // its "SEASON PREDICTIONS" panel stays hidden entirely.
   function hasSeasonPrediction(m: Member) {
-    if (isSurvivor) return m.finalFourPicks.length === finalCount;
+    // Checks "picked something," not "picked exactly finalCount" —
+    // someone who locked in picks before finalCount changed mid-season
+    // (e.g. DWTS going from a final four to a final five) still has a
+    // complete, valid submission under the rules at the time they saved.
+    if (isSurvivor) return m.finalFourPicks.length > 0;
     if (isTraitors) return !!m.winnerPick;
-    return !!m.winnerPick && m.finalFourPicks.length === finalCount;
+    return !!m.winnerPick && m.finalFourPicks.length > 0;
   }
   const seasonPredictionsUnlocked = (!!me && hasSeasonPrediction(me)) || isAdminPreview;
   const seasonSubmittedCount = members.filter(hasSeasonPrediction).length;
