@@ -38,7 +38,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const when = openAt ? formatOpenDate(openAt, league.timezone) : "soon";
     return NextResponse.json({ error: `Picks for week ${week} aren't open yet — they open ${when}` }, { status: 400 });
   }
-  if (isWeekDuePassed(week, league.dueDay, league.dueTime, league.timezone, league.startDate)) {
+  if (isWeekDuePassed(week, league.dueDay, league.dueTime, league.timezone, league.startDate, new Date(), league.templateId, league.template?.tag)) {
     const dueAt = weekDueInstant(week, league.dueDay, league.dueTime, league.timezone, league.startDate);
     const when = dueAt ? formatOpenDate(dueAt, league.timezone) : "the deadline";
     return NextResponse.json({ error: `Picks for week ${week} were due ${when} and can't be changed now` }, { status: 400 });

@@ -976,7 +976,7 @@ function WeeklyPicksForm({
   const startDateObj = startDate ? new Date(startDate) : null;
   const weekOpen = isWeekOpen(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
   const weekOpensAt = weekOpen ? null : weekOpenInstant(selectedWeek, template.id, dueDay, dueTime, timezone, startDateObj);
-  const weekDuePassed = isWeekDuePassed(selectedWeek, dueDay, dueTime, timezone, startDateObj);
+  const weekDuePassed = isWeekDuePassed(selectedWeek, dueDay, dueTime, timezone, startDateObj, new Date(), template.id, template.tag);
   const weekDueAt = weekDuePassed ? weekDueInstant(selectedWeek, dueDay, dueTime, timezone, startDateObj) : null;
   const canSave = weekOpen && !weekDuePassed && draftTop.every((c) => c) && new Set(draftTop).size === 3;
 

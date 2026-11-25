@@ -289,17 +289,40 @@ export function weekDueInstant(
   return zonedInstant(dueCalendar.getUTCFullYear(), dueCalendar.getUTCMonth() + 1, dueCalendar.getUTCDate(), h, m, timezone);
 }
 
+// One-time "force closed now" override for a tag's currently-open week —
+// e.g. an episode airs earlier than the league's usual due time, so
+// picks should stop being accepted right away instead of waiting for
+// the normal deadline. Only forces a week that's actually open right
+// now to read as past-due (never reopens an already-passed week, never
+// reaches into a future week that hasn't started yet), and stops making
+// any difference on its own a few days later, once the normal weekly
+// cycle has moved on to a new current week.
+const FORCE_WEEK_CLOSED_OVERRIDE: Record<string, string> = {
+  DWTS: "2026-11-25T02:41:10.000Z",
+};
+const FORCE_CLOSE_WINDOW_MS = 6 * 24 * 60 * 60 * 1000;
+
 export function isWeekDuePassed(
   week: number,
   dueDay: string,
   dueTime: string,
   timezone: string,
   startDate: Date | null,
-  now: Date = new Date()
+  now: Date = new Date(),
+  templateId?: string | null,
+  tag?: string | null
 ): boolean {
   const dueAt = weekDueInstant(week, dueDay, dueTime, timezone, startDate);
-  if (!dueAt) return false;
-  return now.getTime() > dueAt.getTime();
+  if (dueAt && now.getTime() > dueAt.getTime()) return true;
+
+  const override = tag ? FORCE_WEEK_CLOSED_OVERRIDE[tag] : undefined;
+  if (override) {
+    const sinceOverride = now.getTime() - new Date(override).getTime();
+    if (sinceOverride >= 0 && sinceOverride < FORCE_CLOSE_WINDOW_MS) {
+      return isWeekOpen(week, templateId, dueDay, dueTime, timezone, startDate, now);
+    }
+  }
+  return false;
 }
 
 // Formats an arbitrary instant (like a picks-open time) as a concrete date
